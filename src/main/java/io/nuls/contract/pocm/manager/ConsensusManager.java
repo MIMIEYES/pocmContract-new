@@ -1,0 +1,238 @@
+/**
+ * MIT License
+ * <p>
+ * Copyright (c) 2017-2018 nuls.io
+ * <p>
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * <p>
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * <p>
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+package io.nuls.contract.pocm.manager;
+
+import io.nuls.contract.pocm.manager.deposit.DepositOthersManager;
+import io.nuls.contract.pocm.model.ConsensusAwardInfo;
+import io.nuls.contract.sdk.Address;
+import io.nuls.contract.sdk.Msg;
+
+import java.math.BigInteger;
+import java.util.Set;
+
+import static io.nuls.contract.pocm.util.PocmUtil.toNuls;
+import static io.nuls.contract.sdk.Utils.require;
+
+/**
+ * @author: PierreLuo
+ * @date: 2019-05-14
+ */
+public class ConsensusManager {
+    // 2K
+    private BigInteger MIN_JOIN_DEPOSIT = BigInteger.valueOf(200000000000L);
+    // 50W
+    public static final BigInteger MAX_TOTAL_DEPOSIT = BigInteger.valueOf(50000000000000L);
+
+    public static final String ACTIVE_AGENT = "1";
+    // 可用金额
+    private BigInteger availableAmount = BigInteger.ZERO;
+    // 共识奖励金额信息
+    private ConsensusAwardInfo awardInfo;
+    /**
+     * 开启委托到其他节点的功能
+     */
+    private boolean enableDepositOthers = false;
+    private DepositOthersManager depositOthersManager;
+
+    public ConsensusManager() {
+        awardInfo = new ConsensusAwardInfo(Msg.address().toString());
+        enableDepositOthers();
+    }
+
+    /**
+     * 共识奖励收益处理
+     * 委托到其他节点，收益地址只有当前合约地址
+     *
+     * @param args 区块奖励地址明细 eg. [[address, amount]]
+     */
+    public void _payable(String[][] args) {
+        String[] award = args[0];
+        String address = award[0];
+        String amount = award[1];
+        awardInfo.add(new BigInteger(amount));
+    }
+
+
+    private void enableDepositOthers() {
+        require(!enableDepositOthers, "重复操作，已开启此功能");
+        enableDepositOthers = true;
+        depositOthersManager = new DepositOthersManager();
+        depositOthersManager.modifyMinJoinDeposit(MIN_JOIN_DEPOSIT);
+    }
+
+    public String[] addOtherAgent(String agentHash) {
+        require(enableDepositOthers, "未开启此功能");
+        return depositOthersManager.addOtherAgent(agentHash);
+    }
+
+    public void removeAgent(String agentHash){
+        BigInteger depositAmount = depositOthersManager.removeAgent(agentHash);
+        availableAmount = availableAmount.add(depositAmount);
+    }
+
+    public BigInteger otherDepositLockedAmount() {
+        return depositOthersManager.otherDepositLockedAmount();
+    }
+
+    /**
+     * 增加了押金后，押金数额达到条件后，则委托节点
+     * 押金数额未达到条件，则累计总可用押金数额
+     *
+     * @param value          投资的押金
+     */
+    public void createOrDepositIfPermitted(BigInteger value) {
+        availableAmount = availableAmount.add(value);
+        /**
+         * 委托其他节点
+         */
+        if(availableAmount.compareTo(MIN_JOIN_DEPOSIT) >= 0) {
+            BigInteger actualDeposit = depositOthersManager.deposit(availableAmount);
+            availableAmount = availableAmount.subtract(actualDeposit);
+        }
+    }
+
+    /**
+     * 当可用金额达到最小可委托金额时，合约拥有者可手动委托合约节点
+     */
+    public void depositManually() {
+        BigInteger amount = availableAmount;
+        require(amount.compareTo(MIN_JOIN_DEPOSIT) >= 0, "可用金额不足以委托节点");
+        require(depositOthersManager.otherAgentsSize() > 0, "没有添加可委托的共识节点[0]");
+        /**
+         * 委托其他节点
+         */
+        BigInteger actualDeposit = depositOthersManager.deposit(availableAmount);
+        require(actualDeposit.compareTo(BigInteger.ZERO) > 0, "没有可委托的共识节点[1]");
+        availableAmount = availableAmount.subtract(actualDeposit);
+    }
+
+    public Set<String> getAgents() {
+        return depositOthersManager.getAgents();
+    }
+
+    /**
+     * 如果合约余额不足，则退出其他节点的委托和合约节点的委托，直到余额足以退还押金
+     *
+     * @param value 需要退还的押金
+     * @return true - 退出委托后余额足够, false - 退出委托，可用余额不足以退还押金
+     */
+    public boolean withdrawIfPermittedWrapper(BigInteger value) {
+        if (availableAmount.compareTo(value) >= 0) {
+            availableAmount = availableAmount.subtract(value);
+            return true;
+        }else{
+            value = value.subtract(availableAmount);
+            availableAmount = BigInteger.ZERO;
+        }
+        // 退出委托其他节点的金额
+        BigInteger actualWithdraw = depositOthersManager.withdraw(value);
+        availableAmount = availableAmount.add(actualWithdraw);
+        if (availableAmount.compareTo(value) < 0) {
+            return false;
+        }
+        availableAmount = availableAmount.subtract(value);
+        /**
+         * 若可用金额足够，则委托其他节点
+         */
+        if(availableAmount.compareTo(MIN_JOIN_DEPOSIT) >= 0) {
+            BigInteger actualDeposit = depositOthersManager.deposit(availableAmount);
+            availableAmount = availableAmount.subtract(actualDeposit);
+        }
+        return true;
+    }
+
+    /**
+     * 转移共识奖励金额
+     */
+    public void transferConsensusReward(Address beneficiary) {
+        BigInteger availableAward = awardInfo.getAvailableAward();
+        require(availableAward.compareTo(BigInteger.ZERO) > 0, "无可用的共识奖励金额");
+        // 清零
+        awardInfo.resetAvailableAward();
+        beneficiary.transfer(availableAward);
+    }
+
+    /**
+     * 可转移的共识奖励
+     */
+    public BigInteger getAvailableConsensusReward() {
+        return awardInfo.getAvailableAward();
+    }
+
+    /**
+     * 已转移的共识奖励
+     */
+    public BigInteger getTransferedConsensusReward() {
+        return awardInfo.getTransferedAward();
+    }
+
+    /**
+     * 获取可委托共识的空闲金额
+     */
+    public BigInteger getAvailableAmount() {
+        return availableAmount;
+    }
+
+    public void setAvailableAmount(BigInteger availableAmount) {
+        this.availableAmount = availableAmount;
+    }
+
+    public void repairAmount(BigInteger value) {
+        this.availableAmount = this.availableAmount.add(value);
+    }
+
+    public void modifyMinJoinDeposit(BigInteger value) {
+        MIN_JOIN_DEPOSIT = value;
+        if(enableDepositOthers) {
+            depositOthersManager.modifyMinJoinDeposit(MIN_JOIN_DEPOSIT);
+        }
+    }
+
+    public BigInteger getMinJoinDeposit() {
+        return MIN_JOIN_DEPOSIT;
+    }
+
+    public void withdrawSpecifiedAmount(BigInteger value) {
+        // 退出委托其他节点的金额
+        BigInteger actualWithdraw = depositOthersManager.withdraw(value);
+        availableAmount = availableAmount.add(actualWithdraw);
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("{");
+        sb.append("\"availableAmount\":")
+                .append('\"').append(toNuls(availableAmount).toPlainString()).append('\"');
+        sb.append(",\"awardInfo\":")
+                .append(awardInfo.toString());
+        if(enableDepositOthers) {
+            sb.append(",\"depositOthersManager\":")
+                    .append(depositOthersManager.toString());
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
+
+}
