@@ -164,7 +164,7 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     @Payable
-    public void deposit() {
+    public void depositForOwn() {
         require(isAllocationToken() && isAcceptDeposit(), "No candy token in the contract");
         require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
         Address sender = Msg.sender();
