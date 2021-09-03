@@ -24,8 +24,6 @@
 package io.nuls.contract.pocm.util;
 
 import io.nuls.contract.sdk.Address;
-import io.nuls.contract.sdk.Msg;
-import io.nuls.contract.sdk.Utils;
 
 import java.math.BigInteger;
 
@@ -35,7 +33,7 @@ import static io.nuls.contract.sdk.Utils.require;
  * @author: PierreLuo
  * @date: 2021/8/31
  */
-public class NRC20Wrapper implements NRC20Token {
+public class NRC20Wrapper implements CandyToken {
 
     private Address nrc20Token;
 

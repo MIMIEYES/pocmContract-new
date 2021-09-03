@@ -7,7 +7,7 @@ import io.nuls.contract.sdk.annotation.View;
 
 import java.math.BigInteger;
 
-public interface NRC20Token {
+public interface CandyToken {
 
     String name();
 

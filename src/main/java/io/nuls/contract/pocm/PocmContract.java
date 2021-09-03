@@ -4,16 +4,15 @@ import io.nuls.contract.pocm.event.*;
 import io.nuls.contract.pocm.manager.ConsensusManager;
 import io.nuls.contract.pocm.manager.TotalDepositManager;
 import io.nuls.contract.pocm.model.ConsensusAgentDepositInfo;
+import io.nuls.contract.pocm.model.CurrentMingInfo;
 import io.nuls.contract.pocm.model.UserInfo;
 import io.nuls.contract.pocm.ownership.Ownable;
+import io.nuls.contract.pocm.util.AssetWrapper;
+import io.nuls.contract.pocm.util.CandyToken;
 import io.nuls.contract.pocm.util.NRC20Wrapper;
 import io.nuls.contract.pocm.util.PocmUtil;
 import io.nuls.contract.sdk.*;
-import io.nuls.contract.sdk.annotation.JSONSerializable;
-import io.nuls.contract.sdk.annotation.Payable;
-import io.nuls.contract.sdk.annotation.Required;
-import io.nuls.contract.sdk.annotation.View;
-import org.apache.catalina.User;
+import io.nuls.contract.sdk.annotation.*;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -36,12 +35,14 @@ public class PocmContract extends Ownable implements Contract {
     private final BigInteger _1e12 = BigInteger.TEN.pow(12);
 
     Map<String, UserInfo> userInfo = new HashMap<String, UserInfo>();
-    Address candyToken; // Address of LP token contract.
+    Address candyToken; // Address of candy token contract.
+    int candyAssetChainId;// chainId of candy token contract.
+    int candyAssetId;// assetId of candy token contract.
     Long lastRewardBlock;  // Last block number that token distribution occurs.
     BigInteger accPerShare;    // Accumulated token per share, times 1e12. See below.
     BigInteger candyPerBlock;
     BigInteger lpSupply; // 抵押总量
-    BigInteger candyBalance;
+    BigInteger candySupply;// 糖果发行总量
     private BigInteger allocationAmount = BigInteger.ZERO;//已经分配的Token数量
     private int lockedTokenDay;// 获取Token奖励的锁定天数
     private long lockedTime;
@@ -54,13 +55,16 @@ public class PocmContract extends Ownable implements Contract {
     private int awardingCycle;// 奖励发放周期（参数类型为数字，每过N块发放一次）
     private TotalDepositManager totalDepositManager;// 总抵押金额管理器
     private ConsensusManager consensusManager;// 共识管理器
-    private NRC20Wrapper candyTokenWrapper;
+    private CandyToken candyTokenWrapper;
     private boolean isAllocationToken = false;//项目是否初始分配了糖果token
     private boolean isAcceptDeposit = false;//是否接受抵押
+    private boolean isNRC20Candy = false;//糖果是否是NRC20资产
     private Map<String, ConsensusAgentDepositInfo> agentDeposits = new HashMap<String, ConsensusAgentDepositInfo>();
 
     /**
-     * @param candyToken                        糖果token地址
+     * @param candyToken                        糖果token地址（NRC20资产，和`candyAssetChainId`,`candyAssetId`不能同时存在）
+     * @param candyAssetChainId                 糖果资产链ID（非NRC20资产，和`candyToken`不能同时存在）
+     * @param candyAssetId                      糖果资产ID（非NRC20资产，和`candyToken`不能同时存在）
      * @param candyPerCycle                     单周期奖励的Token数量
      * @param awardingCycle                     奖励发放周期
      * @param amount                            糖果token分配总量
@@ -72,6 +76,8 @@ public class PocmContract extends Ownable implements Contract {
      * @param authorizationCode                 dapp的唯一识别码
      */
     public PocmContract(Address candyToken,
+                        int candyAssetChainId,
+                        int candyAssetId,
                         BigInteger candyPerCycle,
                         int awardingCycle,
                         BigInteger amount,
@@ -81,7 +87,18 @@ public class PocmContract extends Ownable implements Contract {
                         boolean openConsensus,
                         boolean openAwardConsensusNodeProvider,
                         String authorizationCode) {
-        require(candyToken.isContract(), "initial: candyToken not good");
+        // 糖果资产检查
+        int valid = candyAssetChainId + candyAssetId;
+        if (candyToken == null && valid == 0) revert("initial: candyToken not good");
+        require(candyToken == null || valid == 0, "initial: candyToken not good");
+        if (candyToken != null) {
+            require(candyToken.isContract(), "initial: candyToken not good");
+            isNRC20Candy = true;
+            this.candyTokenWrapper = new NRC20Wrapper(candyToken);
+        } else {
+            isNRC20Candy = false;
+            this.candyTokenWrapper = new AssetWrapper(candyAssetChainId, candyAssetId);
+        }
         require(candyPerCycle.compareTo(BigInteger.ZERO) > 0, "initial: candyPerCycle not good");
         require(awardingCycle > 0, "initial: awardingCycle not good");
         require(amount.compareTo(BigInteger.ZERO) > 0, "initial: amount not good");
@@ -90,9 +107,11 @@ public class PocmContract extends Ownable implements Contract {
         require(minimumLocked > 0, "initial: minimumLocked not good");
 
         this.candyToken = candyToken;
+        this.candyAssetChainId = candyAssetChainId;
+        this.candyAssetId = candyAssetId;
         this.candyPerCycle = candyPerCycle;
         this.awardingCycle = awardingCycle;
-        this.candyBalance = amount;
+        this.candySupply = amount;
         this.lockedTokenDay = lockedTokenDay;
         this.minimumDeposit = minimumDeposit;
         this.minimumLocked = minimumLocked;
@@ -108,12 +127,22 @@ public class PocmContract extends Ownable implements Contract {
         this.lockedTime = this.lockedTokenDay * TIMEPERDAY;
         this.lastRewardBlock = Block.number();
         this.candyPerBlock = candyPerCycle.divide(BigInteger.valueOf(awardingCycle));
-        this.candyTokenWrapper = new NRC20Wrapper(candyToken);
     }
 
     @Override
     public void _payable() {
         revert("Do not accept direct transfers");
+    }
+
+    @Override
+    @PayableMultyAsset
+    public void _payableMultyAsset() {
+        require(!isNRC20Candy, "transfer: do not accept direct transfers");
+        MultyAssetValue[] values = Msg.multyAssetValues();
+        if (values == null) return;
+        require(values.length == 1, "transfer: asset not good");
+        MultyAssetValue value = values[0];
+        require(value.getAssetChainId() == candyAssetChainId && value.getAssetId() == candyAssetId, "transfer: asset not good");
     }
 
     /**
@@ -129,9 +158,15 @@ public class PocmContract extends Ownable implements Contract {
         consensusManager._payable(args);
     }
 
+    public void addCandySupply(BigInteger _amount) {
+        onlyOwnerOrOffcial();
+        this.candySupply = this.candySupply.add(_amount);
+    }
+
     @Payable
     public void deposit() {
         require(isAllocationToken() && isAcceptDeposit(), "No candy token in the contract");
+        require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
         Address sender = Msg.sender();
         String senderAddress = sender.toString();
         UserInfo user = this.userInfo.get(senderAddress);
@@ -173,13 +208,10 @@ public class PocmContract extends Ownable implements Contract {
 
         // 退还抵押金的小数位
         if (hasDecimal) {
-            Msg.sender().transfer(decimalValue);
+            sender.transfer(decimalValue);
         }
-        //TODO pierre 抵押事件
-
-        //emit(new DepositDetailInfoEvent(info.getDepositDetailInfo(), value));
-
-        emit(new Deposit(senderAddress, _amount.toString()));
+        // 抵押事件
+        emit(new DepositDetailInfoEvent(_amount, 0, _amount, availableAmount, _amount.subtract(availableAmount), blockNumber, senderAddress));
     }
 
     // Withdraw LP tokens from pool.
@@ -574,7 +606,17 @@ public class PocmContract extends Ownable implements Contract {
      */
     @View
     public String calcUnAllocationTokenAmount() {
-        return this.candyBalance.toString();
+        return this.candyTokenWrapper.balanceOf(Msg.address()).toString();
+    }
+
+    /**
+     * 已分配的Token数量
+     *
+     * @return
+     */
+    @View
+    public String getAllocationAmount() {
+        return this.allocationAmount.toString();
     }
 
     // View function to see pending token on frontend.
@@ -593,13 +635,31 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     private void receiveInternal(Address sender, UserInfo user) {
+        BigInteger candyBalance = this.candyTokenWrapper.balanceOf(Msg.address());
+        require(candyBalance.compareTo(BigInteger.ZERO) > 0, "No candy token in the contract");
+        require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
         if (user.getAvailableAmount().compareTo(BigInteger.ZERO) > 0) {
             BigInteger pending = user.getAvailableAmount().multiply(this.accPerShare).divide(_1e12).subtract(user.getRewardDebt());
             if (pending.compareTo(BigInteger.ZERO) > 0) {
-                safeTokenTransfer(this.candyTokenWrapper, sender, pending, this.candyBalance);
-                this.candyBalance = this.candyBalance.subtract(pending);
-                this.allocationAmount = this.allocationAmount.add(pending);
-                //TODO pierre 奖励领取事件
+                // 发放的奖励 <= 糖果余额
+                BigInteger amount;
+                if (candyBalance.compareTo(pending) > 0) {
+                    amount = pending;
+                } else {
+                    amount = candyBalance;
+                    this.isAcceptDeposit = false;
+                }
+                // 发放的奖励 + 已发放的奖励 <= 糖果发行量
+                BigInteger limitCandy = this.candySupply.subtract(this.allocationAmount);
+                if (limitCandy.compareTo(amount) <= 0) {
+                    amount = limitCandy;
+                }
+                this.candyTokenWrapper.transferLocked(sender, amount, lockedTime);
+                this.allocationAmount = this.allocationAmount.add(amount);
+                // 奖励领取事件
+                ArrayList<CurrentMingInfo> list = new ArrayList<CurrentMingInfo>();
+                list.add(new CurrentMingInfo(0, amount, sender.toString(), 0));
+                emit(new CurrentMiningInfoEvent(list));
             }
         }
     }
@@ -624,6 +684,7 @@ public class PocmContract extends Ownable implements Contract {
         if (user.getAvailableAmount().equals(BigInteger.ZERO)) {
             this.userInfo.remove(senderAddress);
         }
+        // 提现事件
         emit(new Withdraw(senderAddress, _amount.toString()));
     }
 
@@ -636,7 +697,10 @@ public class PocmContract extends Ownable implements Contract {
         if (_amount.compareTo(BigInteger.ZERO) > 0) {
             sender.transfer(_amount);
         }
-        emit(new EmergencyWithdraw(senderAddress, _amount.toString()));
+        // 紧急提现，退出抵押事件
+        List<Long> depositNumbers = new ArrayList<Long>();
+        depositNumbers.add(0L);
+        emit(new QuitDepositEvent(depositNumbers, senderAddress));
         this.lpSupply = this.lpSupply.subtract(available);
         this.userInfo.remove(senderAddress);
     }
@@ -645,10 +709,14 @@ public class PocmContract extends Ownable implements Contract {
         return isAcceptDeposit;
     }
 
+    private boolean unreachedLimitCandySupply() {
+        return this.candySupply.compareTo(this.allocationAmount) > 0;
+    }
+
     private boolean isAllocationToken() {
         if (!isAllocationToken) {
             BigInteger balance = candyTokenWrapper.balanceOf(Msg.address());
-            if (balance.compareTo(candyBalance) >= 0) {
+            if (balance.compareTo(candySupply) >= 0) {
                 isAllocationToken = true;
                 isAcceptDeposit = true;
             }
@@ -697,16 +765,6 @@ public class PocmContract extends Ownable implements Contract {
         this.lastRewardBlock = blockNumber;
     }
 
-    private void safeTokenTransfer(NRC20Wrapper token, Address _to, BigInteger _amount, BigInteger _poolBalance) {
-        BigInteger bal = token.balanceOf(Msg.address());
 
-        if (_amount.compareTo(bal) > 0 && _poolBalance.compareTo(bal) > 0) {
-            token.transferLocked(_to, bal, lockedTime);
-        } else if(_amount.compareTo(_poolBalance) > 0  && bal.compareTo(_poolBalance) > 0){
-            token.transferLocked(_to, _poolBalance, lockedTime);
-        }else{
-            token.transferLocked(_to, _amount, lockedTime);
-        }
-    }
 
 }
