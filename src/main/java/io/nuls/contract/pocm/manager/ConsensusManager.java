@@ -23,15 +23,21 @@
  */
 package io.nuls.contract.pocm.manager;
 
+import io.nuls.contract.pocm.PocmContract;
+import io.nuls.contract.pocm.event.RemoveAgentEvent;
 import io.nuls.contract.pocm.manager.deposit.DepositOthersManager;
+import io.nuls.contract.pocm.model.ConsensusAgentDepositInfo;
 import io.nuls.contract.pocm.model.ConsensusAwardInfo;
+import io.nuls.contract.pocm.model.UserInfo;
 import io.nuls.contract.sdk.Address;
 import io.nuls.contract.sdk.Msg;
 
 import java.math.BigInteger;
+import java.util.Map;
 import java.util.Set;
 
 import static io.nuls.contract.pocm.util.PocmUtil.toNuls;
+import static io.nuls.contract.sdk.Utils.emit;
 import static io.nuls.contract.sdk.Utils.require;
 
 /**
@@ -55,9 +61,20 @@ public class ConsensusManager {
     private boolean enableDepositOthers = false;
     private DepositOthersManager depositOthersManager;
 
-    public ConsensusManager() {
+    private Map<String, UserInfo> userInfo;
+    private Map<String, ConsensusAgentDepositInfo> agentDeposits;
+    private PocmContract pocmContract;
+    private PocmInfo pi;
+
+    public ConsensusManager(Map<String, UserInfo> userInfo,
+                            Map<String, ConsensusAgentDepositInfo> agentDeposits,
+                            PocmContract pocmContract, PocmInfo pi) {
         awardInfo = new ConsensusAwardInfo(Msg.address().toString());
         enableDepositOthers();
+        this.userInfo = userInfo;
+        this.agentDeposits = agentDeposits;
+        this.pocmContract = pocmContract;
+        this.pi = pi;
     }
 
     /**
@@ -86,8 +103,8 @@ public class ConsensusManager {
         return depositOthersManager.addOtherAgent(agentHash);
     }
 
-    public void removeAgent(String agentHash){
-        BigInteger depositAmount = depositOthersManager.removeAgent(agentHash);
+    private void remove(String agentHash){
+        BigInteger depositAmount = depositOthersManager.removeAgent(agentHash, this);
         availableAmount = availableAmount.add(depositAmount);
     }
 
@@ -146,7 +163,7 @@ public class ConsensusManager {
             availableAmount = BigInteger.ZERO;
         }
         // 退出委托其他节点的金额
-        BigInteger actualWithdraw = depositOthersManager.withdraw(value);
+        BigInteger actualWithdraw = depositOthersManager.withdrawInner(value, this);
         availableAmount = availableAmount.add(actualWithdraw);
         if (availableAmount.compareTo(value) < 0) {
             return false;
@@ -215,8 +232,44 @@ public class ConsensusManager {
 
     public void withdrawSpecifiedAmount(BigInteger value) {
         // 退出委托其他节点的金额
-        BigInteger actualWithdraw = depositOthersManager.withdraw(value);
+        BigInteger actualWithdraw = depositOthersManager.withdrawInner(value, this);
         availableAmount = availableAmount.add(actualWithdraw);
+    }
+
+    public void removeAgentInner(String agentHash) {
+        require(pi.openConsensus, "Consensus is not turned on");
+        this.remove(agentHash);
+        emit(new RemoveAgentEvent(agentHash));
+
+        //1.共识节点的创建者先领取奖励
+        ConsensusAgentDepositInfo agentDepositInfo = agentDeposits.get(agentHash);
+        require(agentDepositInfo != null, "This consensus node is not registered");
+
+        String userAddress = agentDepositInfo.getDepositorAddress();
+        UserInfo user = userInfo.get(userAddress);
+        //TODO pierre user断言，测试完成后移除
+        require(user != null, "user not exist");
+        if (user != null) {
+            // 存在抵押记录，领取奖励
+            pocmContract.receiveAwardsByAddress(new Address(userAddress));
+
+            //2.共识节点的创建者退出
+            BigInteger agentAmount = user.getAgentAmount();
+            boolean openNodeAward = user.isOpenNodeAward();
+            // 如果共识节点有糖果奖励，扣减user的可用抵押金，扣减项目的总抵押金
+            if (openNodeAward) {
+                user.subAmount(BigInteger.ZERO, agentAmount);
+                pi.lpSupply = pi.lpSupply.subtract(agentAmount);
+            }
+            if (!user.getAvailableAmount().equals(BigInteger.ZERO)) {
+                user.setRewardDebt(user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12));
+            } else {
+                userInfo.remove(userAddress);
+            }
+            user.setAgentAmount(BigInteger.ZERO);
+            user.setOpenNodeAward(false);
+        }
+        agentDeposits.remove(agentHash);
     }
 
     @Override

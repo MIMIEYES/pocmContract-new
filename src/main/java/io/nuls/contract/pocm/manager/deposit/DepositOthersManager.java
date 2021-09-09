@@ -23,15 +23,19 @@
  */
 package io.nuls.contract.pocm.manager.deposit;
 
+import io.nuls.contract.pocm.manager.ConsensusManager;
 import io.nuls.contract.pocm.model.AgentInfo;
 import io.nuls.contract.pocm.model.ConsensusDepositInfo;
 import io.nuls.contract.sdk.Utils;
+import io.nuls.contract.sdk.event.DebugEvent;
+import sun.security.ssl.Debug;
 
 import java.math.BigInteger;
 import java.util.*;
 
 import static io.nuls.contract.pocm.manager.ConsensusManager.MAX_TOTAL_DEPOSIT;
 import static io.nuls.contract.pocm.util.PocmUtil.toNuls;
+import static io.nuls.contract.sdk.Utils.emit;
 import static io.nuls.contract.sdk.Utils.require;
 
 /**
@@ -79,9 +83,7 @@ public class DepositOthersManager {
         return (String[]) agentInfo;
     }
 
-    public BigInteger removeAgent(String agentHash) {
-        BigInteger withdrawAmount = BigInteger.ZERO;
-        require(otherAgents.containsKey(agentHash), "节点不存在");
+    private boolean isEnableAgentNode(String agentHash) {
         Object agentInfo = Utils.invokeExternalCmd("cs_getContractAgentInfo", new String[]{agentHash});
         boolean isEnabled;
         if (agentInfo == null ){
@@ -90,13 +92,20 @@ public class DepositOthersManager {
             String[] agent = (String[])agentInfo;
             isEnabled = "-1".equals(agent[8]);
         }
+        return isEnabled;
+    }
+
+    public BigInteger removeAgent(String agentHash, ConsensusManager consensusManager) {
+        BigInteger withdrawAmount = BigInteger.ZERO;
+        require(otherAgents.containsKey(agentHash), "节点不存在");
+        boolean isEnabled = isEnableAgentNode(agentHash);
         //退出节点委托
         Iterator<ConsensusDepositInfo> iterator = depositList.iterator();
         while (iterator.hasNext()){
             ConsensusDepositInfo depositInfo = iterator.next();
             if(agentHash.equals(depositInfo.getAgentHash())){
                 if(isEnabled){
-                    this.withdraw(depositInfo);
+                    this.withdrawInner(depositInfo, consensusManager);
                 }else{
                     depositLockedAmount = depositLockedAmount.subtract(depositInfo.getDeposit());
                 }
@@ -168,15 +177,16 @@ public class DepositOthersManager {
 
     /**
      * @param expectWithdrawAmount 期望退出的金额
+     * @param consensusManager
      * @return actualWithdrawAmount 实际退出的金额(始终大于或等于期望值)
      */
-    public BigInteger withdraw(BigInteger expectWithdrawAmount) {
+    public BigInteger withdrawInner(BigInteger expectWithdrawAmount, ConsensusManager consensusManager) {
         BigInteger actualWithdraw = BigInteger.ZERO;
         // 退出所有委托
         if(expectWithdrawAmount.compareTo(depositLockedAmount) >= 0) {
             actualWithdraw = depositLockedAmount;
             for(ConsensusDepositInfo info : depositList) {
-                this.withdraw(info);
+                this.withdrawInner(info, consensusManager);
             }
             depositLockedAmount = BigInteger.ZERO;
             depositList.clear();
@@ -184,7 +194,7 @@ public class DepositOthersManager {
         } else {
             BigInteger withdrawAmount;
             while (!expectWithdrawAmount.equals(BigInteger.ZERO)){
-                withdrawAmount = withdrawRecursion(expectWithdrawAmount);
+                withdrawAmount = withdrawRecursion(expectWithdrawAmount, consensusManager);
                 actualWithdraw = actualWithdraw.add(withdrawAmount);
                 if(withdrawAmount.compareTo(expectWithdrawAmount) >= 0){
                     expectWithdrawAmount = BigInteger.ZERO;
@@ -206,30 +216,45 @@ public class DepositOthersManager {
         return txHash;
     }
 
-    private String withdraw(ConsensusDepositInfo info) {
-        String joinAgentHash = info.getHash();
-        String[] args = new String[]{joinAgentHash};
-        String txHash = (String) Utils.invokeExternalCmd("cs_contractWithdraw", args);
-        depositLockedAmount = depositLockedAmount.subtract(info.getDeposit());
-        AgentInfo agent = otherAgents.get(info.getAgentHash());
-        agent.subtract(info.getDeposit());
-        return txHash;
+    private String withdrawInner(ConsensusDepositInfo info, ConsensusManager consensusManager) {
+        String agentHash = info.getAgentHash();
+        try {
+            String joinAgentHash = info.getHash();
+            String[] args = new String[]{joinAgentHash};
+            String txHash = (String) Utils.invokeExternalCmd("cs_contractWithdraw", args);
+            depositLockedAmount = depositLockedAmount.subtract(info.getDeposit());
+            AgentInfo agent = otherAgents.get(agentHash);
+            agent.subtract(info.getDeposit());
+            return txHash;
+        } catch (Exception e) {
+            if (e == null) {
+                emit(new DebugEvent("withdrawInner error", "empty exception"));
+            } else {
+                emit(new DebugEvent("withdrawInner error", e.getMessage()));
+            }
+            boolean isEnabled = isEnableAgentNode(agentHash);
+            if (!isEnabled) {
+                consensusManager.removeAgentInner(agentHash);
+            }
+            return null;
+        }
+
     }
 
-    private BigInteger withdrawRecursion(BigInteger expectWithdrawAmount){
+    private BigInteger withdrawRecursion(BigInteger expectWithdrawAmount, ConsensusManager consensusManager){
         ConsensusDepositInfo maxDeposit = depositList.getLast();
         BigInteger realWithdrawAmount = BigInteger.ZERO;
         //当退出金额大于最大的委托则退出最大委托；否则从小到大遍历找到大于退出金额的第一条委托记录
         if(expectWithdrawAmount.compareTo(maxDeposit.getDeposit()) >= 0){
             depositList.removeLast();
-            this.withdraw(maxDeposit);
+            this.withdrawInner(maxDeposit, consensusManager);
             realWithdrawAmount = maxDeposit.getDeposit();
         }else{
             // 找出最小的一笔退出抵押的金额（使闲置金额最小）
             for(Iterator<ConsensusDepositInfo> iterator = depositList.iterator(); iterator.hasNext();){
                 ConsensusDepositInfo info = iterator.next();
                 if(info.getDeposit().compareTo(expectWithdrawAmount) >= 0) {
-                    this.withdraw(info);
+                    this.withdrawInner(info, consensusManager);
                     realWithdrawAmount = info.getDeposit();
                     iterator.remove();
                     break;

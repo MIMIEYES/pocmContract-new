@@ -23,6 +23,7 @@
  */
 package io.nuls.contract.pocm.manager;
 
+import io.nuls.contract.pocm.PocmContract;
 import io.nuls.contract.sdk.Msg;
 
 import java.math.BigInteger;
