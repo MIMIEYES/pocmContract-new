@@ -47,12 +47,9 @@ public class PocmContract extends Ownable implements Contract {
     private int lockedTokenDay;// 获取Token奖励的锁定天数
     private long lockedTime;
     private BigInteger minimumDeposit;// 最低抵押na数量(1亿个na等于1个NULS）
-    private int minimumLocked;// 最短锁定区块（参数类型为数字，N个块后才可退出抵押）
     private boolean openConsensus = false;//是否开启合约共识功能
     private boolean openAwardConsensusNodeProvider = false;//是否奖励共识节点提供者
     private String authorizationCode;//dapp的唯一识别码
-    private BigInteger candyPerCycle;// 单周期奖励的Token数量
-    private int awardingCycle;// 奖励发放周期（参数类型为数字，每过N块发放一次）
     private TotalDepositManager totalDepositManager;// 总抵押金额管理器
     private ConsensusManager consensusManager;// 共识管理器
     private CandyToken candyTokenWrapper;
@@ -65,12 +62,10 @@ public class PocmContract extends Ownable implements Contract {
      * @param candyToken                        糖果token地址（NRC20资产，和`candyAssetChainId`,`candyAssetId`不能同时存在）
      * @param candyAssetChainId                 糖果资产链ID（非NRC20资产，和`candyToken`不能同时存在）
      * @param candyAssetId                      糖果资产ID（非NRC20资产，和`candyToken`不能同时存在）
-     * @param candyPerCycle                     单周期奖励的Token数量
-     * @param awardingCycle                     奖励发放周期
+     * @param candyPerBlock                     每个区块奖励的Token数量
      * @param amount                            糖果token分配总量
      * @param lockedTokenDay                    获取Token奖励的锁定天数
      * @param minimumDeposit                    最低抵押NULS数量
-     * @param minimumLocked                     锁定区块个数（N个块后才可退出抵押）
      * @param openConsensus                     是否开启合约共识
      * @param openAwardConsensusNodeProvider    是否奖励共识节点提供者
      * @param authorizationCode                 dapp的唯一识别码
@@ -78,12 +73,10 @@ public class PocmContract extends Ownable implements Contract {
     public PocmContract(Address candyToken,
                         int candyAssetChainId,
                         int candyAssetId,
-                        BigInteger candyPerCycle,
-                        int awardingCycle,
+                        BigInteger candyPerBlock,
                         BigInteger amount,
                         int lockedTokenDay,
                         BigInteger minimumDeposit,
-                        int minimumLocked,
                         boolean openConsensus,
                         boolean openAwardConsensusNodeProvider,
                         String authorizationCode) {
@@ -99,22 +92,18 @@ public class PocmContract extends Ownable implements Contract {
             isNRC20Candy = false;
             this.candyTokenWrapper = new AssetWrapper(candyAssetChainId, candyAssetId);
         }
-        require(candyPerCycle.compareTo(BigInteger.ZERO) > 0, "initial: candyPerCycle not good");
-        require(awardingCycle > 0, "initial: awardingCycle not good");
+        require(candyPerBlock.compareTo(BigInteger.ZERO) > 0, "initial: candyPerBlock not good");
         require(amount.compareTo(BigInteger.ZERO) > 0, "initial: amount not good");
         require(lockedTokenDay >= 0, "initial: lockedTokenDay not good");
         require(minimumDeposit.compareTo(BigInteger.ZERO) > 0, "initial: minimumDeposit not good");
-        require(minimumLocked > 0, "initial: minimumLocked not good");
 
         this.candyToken = candyToken;
         this.candyAssetChainId = candyAssetChainId;
         this.candyAssetId = candyAssetId;
-        this.candyPerCycle = candyPerCycle;
-        this.awardingCycle = awardingCycle;
+        this.candyPerBlock = candyPerBlock;
         this.candySupply = amount;
         this.lockedTokenDay = lockedTokenDay;
         this.minimumDeposit = minimumDeposit;
-        this.minimumLocked = minimumLocked;
         this.openConsensus = openConsensus;
         this.totalDepositManager = new TotalDepositManager();
         if (openConsensus) {
@@ -126,7 +115,6 @@ public class PocmContract extends Ownable implements Contract {
         this.lpSupply = BigInteger.ZERO;
         this.lockedTime = this.lockedTokenDay * TIMEPERDAY;
         this.lastRewardBlock = Block.number();
-        this.candyPerBlock = candyPerCycle.divide(BigInteger.valueOf(awardingCycle));
     }
 
     @Override
@@ -280,21 +268,21 @@ public class PocmContract extends Ownable implements Contract {
      * 开启共识获得糖果奖励
      */
     public void openConsensusNodeAward() {
-        onlyOwner();
+        onlyOffcial();
         this.openAwardConsensusNodeProvider = true;
     }
     /**
      * 关闭共识获得糖果奖励
      */
     public void closeConsensusNodeAward() {
-        onlyOwnerOrOffcial();
+        onlyOffcial();
         this.openAwardConsensusNodeProvider = false;
     }
     /**
      * 开启共识功能
      */
     public void openConsensus() {
-        onlyOwner();
+        onlyOffcial();
         require(!this.openConsensus, "Consensus has been turned on");
         this.openConsensus = true;
         if (this.consensusManager == null) {
@@ -304,7 +292,7 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     public void closeConsensus() {
-        onlyOwnerOrOffcial();
+        onlyOffcial();
         require(openConsensus, "Consensus has been turned off");
         this.openConsensus = false;
         totalDepositManager.closeConsensus();
@@ -493,16 +481,6 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     @View
-    public long awardingCycle() {
-        return this.awardingCycle;
-    }
-
-    @View
-    public BigInteger getCandyPerCycle() {
-        return candyPerCycle;
-    }
-
-    @View
     public String getAuthorizationCode() {
         return authorizationCode;
     }
@@ -510,11 +488,6 @@ public class PocmContract extends Ownable implements Contract {
     @View
     public BigInteger minimumDeposit() {
         return this.minimumDeposit;
-    }
-
-    @View
-    public int minimumLocked() {
-        return this.minimumLocked;
     }
 
     @View
@@ -667,7 +640,6 @@ public class PocmContract extends Ownable implements Contract {
     private void withdrawByUser(Address sender, UserInfo user, BigInteger _amount) {
         String senderAddress = sender.toString();
         require(user.getAmount().compareTo(_amount) >= 0, "withdraw: amount not good");
-        require(checkDepositLocked(user) == -1, "withdraw: deposit locked!");
         updatePool();
         // 领取奖励
         this.receiveInternal(sender, user);
@@ -722,17 +694,6 @@ public class PocmContract extends Ownable implements Contract {
             }
         }
         return isAllocationToken;
-    }
-
-    private long checkDepositLocked(UserInfo userInfo) {
-        long currentHeight = Block.number();
-        long unLockedHeight = userInfo.getLastDepositHeight() + minimumLocked + 1;
-        if (unLockedHeight > currentHeight) {
-            // 锁定中
-            return unLockedHeight;
-        }
-        //已解锁
-        return -1;
     }
 
     private void giveUpByUser(String userAddress) {
