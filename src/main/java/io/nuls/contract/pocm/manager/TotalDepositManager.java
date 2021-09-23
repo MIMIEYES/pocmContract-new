@@ -23,7 +23,6 @@
  */
 package io.nuls.contract.pocm.manager;
 
-import io.nuls.contract.pocm.PocmContract;
 import io.nuls.contract.sdk.Msg;
 
 import java.math.BigInteger;
@@ -83,7 +82,7 @@ public class TotalDepositManager {
     }
 
     public void closeConsensus() {
-        require(consensusManager.getAgents() == null, "请先移除共识节点hash");
+        require(consensusManager.getAgents() == null, "Please remove the consensus node hash first");
         this.openConsensus = false;
     }
 

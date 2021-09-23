@@ -1,5 +1,8 @@
 package io.nuls.contract.pocm.ownership;
 
+import io.nuls.contract.pocm.manager.PocmInfo;
+import io.nuls.contract.pocm.util.AssetWrapper;
+import io.nuls.contract.pocm.util.NRC20Wrapper;
 import io.nuls.contract.sdk.Address;
 import io.nuls.contract.sdk.Event;
 import io.nuls.contract.sdk.Msg;
@@ -25,12 +28,18 @@ public class Ownable {
 
     protected Address owner;
 
-    private static final String OFFCIAL_ADDRESS = "NULSd6HgaV1DxYLYUGSdLjBb4Xq3HDzrBnbwN";
-    //private static final String OFFCIAL_ADDRESS = "tNULSeBaMuU6sq72mptyghDXDWQXKJ5QUaWhGj";
+    protected String OFFICIAL_ADDRESS;
+
+    private PocmInfo pi;
 
     public Ownable() {
         this.owner = Msg.sender();
         this.contractCreator = this.owner;
+        if (this.owner.toString().startsWith("NULS")) {
+            OFFICIAL_ADDRESS = "NULSd6Hgga3y4ZDKAdTHmir6R8Xf3Uei1v7LR";
+        } else {
+            OFFICIAL_ADDRESS = "tNULSeBaMshNPEnuqiDhMdSA4iNs6LMgjY6tcL";
+        }
     }
 
     @View
@@ -48,11 +57,11 @@ public class Ownable {
     }
 
     protected void onlyOwnerOrOffcial() {
-        require(Msg.sender().equals(owner) || Msg.sender().toString().equals(OFFCIAL_ADDRESS), "Refused.");
+        require(Msg.sender().equals(owner) || Msg.sender().toString().equals(OFFICIAL_ADDRESS), "Refused.");
     }
 
     protected void onlyOffcial() {
-        require(Msg.sender().toString().equals(OFFCIAL_ADDRESS), "Refused.");
+        require(Msg.sender().toString().equals(OFFICIAL_ADDRESS), "Refused.");
     }
 
     /**
@@ -76,15 +85,22 @@ public class Ownable {
         onlyOwner();
         require(!Msg.address().equals(nrc20), "Do nothing by yourself");
         require(nrc20.isContract(), "[" + nrc20.toString() + "] is not a contract address");
-        String[][] args = new String[][]{new String[]{Msg.address().toString()}};
-        String balance = nrc20.callWithReturnValue("balanceOf", "", args, BigInteger.ZERO);
-        require(new BigInteger(balance).compareTo(value) >= 0, "No enough balance");
+        NRC20Wrapper wrapper = new NRC20Wrapper(nrc20);
+        BigInteger balance = wrapper.balanceOf(Msg.address());
+        require(balance.compareTo(value) >= 0, "No enough balance");
+        wrapper.transfer(to, value);
+    }
 
-        String methodName = "transfer";
-        String[][] args1 = new String[][]{
-                new String[]{to.toString()},
-                new String[]{value.toString()}};
-        nrc20.call(methodName, "(Address to, BigInteger value) return boolean", args1, BigInteger.ZERO);
+    public void transferProjectCandyAsset(Address to, BigInteger value) {
+        onlyOwner();
+        AssetWrapper wrapper = new AssetWrapper(pi.candyAssetChainId, pi.candyAssetId);
+        BigInteger balance = wrapper.balanceOf(Msg.address());
+        require(balance.compareTo(value) >= 0, "No enough balance");
+        wrapper.transfer(to, value);
+    }
+
+    protected void setPocmInfo(PocmInfo pi) {
+        this.pi = pi;
     }
 
     /**

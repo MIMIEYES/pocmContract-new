@@ -87,10 +87,9 @@ public class PocmContract extends Ownable implements Contract {
         pi.candySupply = amount;
         pi.lockedTokenDay = lockedTokenDay;
         pi.minimumDeposit = minimumDeposit;
-        pi.openConsensus = openConsensus;
         this.totalDepositManager = new TotalDepositManager();
         if (openConsensus) {
-            openConsensus();
+            openConsensusInner();
         }
         pi.openAwardConsensusNodeProvider = openAwardConsensusNodeProvider;
         pi.authorizationCode = authorizationCode;
@@ -98,6 +97,7 @@ public class PocmContract extends Ownable implements Contract {
         pi.lpSupply = BigInteger.ZERO;
         pi.lockedTime = pi.lockedTokenDay * pi.TIMEPERDAY;
         pi.lastRewardBlock = Block.number();
+        setPocmInfo(pi);
     }
 
     @Override
@@ -136,7 +136,7 @@ public class PocmContract extends Ownable implements Contract {
 
     @Payable
     public void depositForOwn() {
-        require(isAllocationToken() && isAcceptDeposit(), "No candy token in the contract");
+        require(isAllocationToken() && isAcceptDeposit(), "No enough candy token in the contract");
         require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
         Address sender = Msg.sender();
         String senderAddress = sender.toString();
@@ -185,6 +185,20 @@ public class PocmContract extends Ownable implements Contract {
         emit(new DepositDetailInfoEvent(_amount, 0, _amount, availableAmount, _amount.subtract(availableAmount), blockNumber, senderAddress));
     }
 
+    public void receiveAwards(String unused) {
+        this.receiveAwardsByAddress(Msg.sender());
+    }
+
+    public void receiveAwardsByAddress(Address address) {
+        require(address != null, "empty address");
+        String addressStr = address.toString();
+        UserInfo user = this.userInfo.get(addressStr);
+        require(user != null, "deposit user not exist");
+        updatePool();
+        this.receiveInternal(address, user);
+        user.setRewardDebt(user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12));
+    }
+
     // Withdraw LP tokens from pool.
     public void withdraw(BigInteger _amount) {
         Address sender = Msg.sender();
@@ -203,9 +217,7 @@ public class PocmContract extends Ownable implements Contract {
         this.emergencyWithdrawByUser(sender, user);
     }
 
-    /**
-     * 退出质押
-     */
+
     public void quit(String unused) {
         Address sender = Msg.sender();
         String senderAddress = sender.toString();
@@ -214,21 +226,6 @@ public class PocmContract extends Ownable implements Contract {
         this.withdrawByUser(sender, user, user.getAmount());
     }
 
-    public void receiveAwards(String unused) {
-        this.receiveAwardsByAddress(Msg.sender());
-    }
-
-    public void receiveAwardsByAddress(Address address) {
-        require(address != null, "empty address");
-        String addressStr = address.toString();
-        UserInfo user = this.userInfo.get(addressStr);
-        require(user != null, "deposit user not exist");
-        this.receiveInternal(address, user);
-    }
-
-    /**
-     * 在抵押期间，更新合约可分配的Token数量
-     */
     public void updateTotalAllocation() {
         BigInteger balance = candyTokenWrapper.balanceOf(Msg.address());
         if (balance.compareTo(BigInteger.ZERO) > 0) {
@@ -238,9 +235,6 @@ public class PocmContract extends Ownable implements Contract {
         }
     }
 
-    /**
-     * 合约创建者清空剩余余额
-     */
     public void clearContract() {
         onlyOwner();
         BigInteger balance = Msg.address().balance();
@@ -269,12 +263,7 @@ public class PocmContract extends Ownable implements Contract {
      */
     public void openConsensus() {
         onlyOffcial();
-        require(!pi.openConsensus, "Consensus has been turned on");
-        pi.openConsensus = true;
-        if (this.consensusManager == null) {
-            this.consensusManager = new ConsensusManager(this.userInfo, this.agentDeposits, this, this.pi);
-        }
-        this.totalDepositManager.openConsensus(this.consensusManager);
+        openConsensusInner();
     }
 
     public void closeConsensus() {
@@ -291,7 +280,7 @@ public class PocmContract extends Ownable implements Contract {
         consensusManager.modifyMinJoinDeposit(value);
     }
 
-    public void withdrawSpecifiedAmount(BigInteger value) {
+    public void consensusWithdrawSpecifiedAmount(BigInteger value) {
         onlyOwnerOrOffcial();
         require(pi.openConsensus, "Consensus is not turned on");
         consensusManager.withdrawSpecifiedAmount(value);
@@ -333,7 +322,7 @@ public class PocmContract extends Ownable implements Contract {
     public void addOtherAgent(String agentHash) {
         onlyOwnerOrOffcial();
         require(pi.openConsensus, "Consensus is not turned on");
-        require(isAllocationToken() && isAcceptDeposit(), "No candy token in the contract");
+        require(isAllocationToken() && isAcceptDeposit(), "No enough candy token in the contract");
         String[] agentInfo = consensusManager.addOtherAgent(agentHash);
         String agentAddress = agentInfo[0];
         Collection<ConsensusAgentDepositInfo> agentDepositInfos = agentDeposits.values();
@@ -422,6 +411,11 @@ public class PocmContract extends Ownable implements Contract {
         }
     }
 
+    public BigInteger consensusEmergencyWithdraw(String joinAgentHash) {
+        onlyOffcial();
+        return consensusManager.consensusEmergencyWithdraw(joinAgentHash);
+    }
+
     @View
     public int totalDepositAddressCount() {
         return this.userInfo.size();
@@ -448,6 +442,11 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     @View
+    public BigInteger lpSupply() {
+        return pi.lpSupply;
+    }
+
+    @View
     public int getLockedDay() {
         return pi.lockedTokenDay;
     }
@@ -457,6 +456,10 @@ public class PocmContract extends Ownable implements Contract {
         return VERSION;
     }
 
+    @View
+    public BigInteger getCandySupply() {
+        return pi.candySupply;
+    }
     /**
      * 查询可领取的共识奖励金额
      */
@@ -566,7 +569,7 @@ public class PocmContract extends Ownable implements Contract {
 
     private void receiveInternal(Address sender, UserInfo user) {
         BigInteger candyBalance = this.candyTokenWrapper.balanceOf(Msg.address());
-        require(candyBalance.compareTo(BigInteger.ZERO) > 0, "No candy token in the contract");
+        require(candyBalance.compareTo(BigInteger.ZERO) > 0, "No enough candy token in the contract");
         require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
         if (user.getAvailableAmount().compareTo(BigInteger.ZERO) > 0) {
             BigInteger pending = user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12).subtract(user.getRewardDebt());
@@ -625,13 +628,19 @@ public class PocmContract extends Ownable implements Contract {
         require(isEnoughBalance, "The balance is not enough to refund the deposit, please contact the project party, the deposit: " + available);
         if (_amount.compareTo(BigInteger.ZERO) > 0) {
             sender.transfer(_amount);
+            user.subAmount(_amount, available);
+            // 紧急提现，退出抵押事件，避免节点创建者紧急提现，QuitDepositEvent的事件在后台可能会把正常抵押删除
+            List<Long> depositNumbers = new ArrayList<Long>();
+            depositNumbers.add(0L);
+            emit(new QuitDepositEvent(depositNumbers, senderAddress));
         }
-        // 紧急提现，退出抵押事件
-        List<Long> depositNumbers = new ArrayList<Long>();
-        depositNumbers.add(0L);
-        emit(new QuitDepositEvent(depositNumbers, senderAddress));
+        if (user.getAvailableAmount().equals(BigInteger.ZERO)) {
+            this.userInfo.remove(senderAddress);
+        } else {
+            updatePool();
+            user.setRewardDebt(user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12));
+        }
         pi.lpSupply = pi.lpSupply.subtract(available);
-        this.userInfo.remove(senderAddress);
     }
 
     private boolean isAcceptDeposit() {
@@ -683,6 +692,13 @@ public class PocmContract extends Ownable implements Contract {
         pi.lastRewardBlock = blockNumber;
     }
 
-
+    private void openConsensusInner() {
+        require(!pi.openConsensus, "Consensus has been turned on");
+        pi.openConsensus = true;
+        if (this.consensusManager == null) {
+            this.consensusManager = new ConsensusManager(this.userInfo, this.agentDeposits, this, this.pi);
+        }
+        this.totalDepositManager.openConsensus(this.consensusManager);
+    }
 
 }

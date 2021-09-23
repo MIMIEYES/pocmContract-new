@@ -104,8 +104,7 @@ public class ConsensusManager {
     }
 
     private void remove(String agentHash){
-        BigInteger depositAmount = depositOthersManager.removeAgent(agentHash, this);
-        availableAmount = availableAmount.add(depositAmount);
+        depositOthersManager.removeAgent(agentHash, this);
     }
 
     public BigInteger otherDepositLockedAmount() {
@@ -124,8 +123,7 @@ public class ConsensusManager {
          * 委托其他节点
          */
         if(availableAmount.compareTo(MIN_JOIN_DEPOSIT) >= 0) {
-            BigInteger actualDeposit = depositOthersManager.deposit(availableAmount);
-            availableAmount = availableAmount.subtract(actualDeposit);
+            depositOthersManager.deposit(availableAmount, this);
         }
     }
 
@@ -139,9 +137,8 @@ public class ConsensusManager {
         /**
          * 委托其他节点
          */
-        BigInteger actualDeposit = depositOthersManager.deposit(availableAmount);
+        BigInteger actualDeposit = depositOthersManager.deposit(availableAmount, this);
         require(actualDeposit.compareTo(BigInteger.ZERO) > 0, "没有可委托的共识节点[1]");
-        availableAmount = availableAmount.subtract(actualDeposit);
     }
 
     public Set<String> getAgents() {
@@ -158,13 +155,12 @@ public class ConsensusManager {
         if (availableAmount.compareTo(value) >= 0) {
             availableAmount = availableAmount.subtract(value);
             return true;
-        }else{
+        } else {
             value = value.subtract(availableAmount);
             availableAmount = BigInteger.ZERO;
         }
         // 退出委托其他节点的金额
-        BigInteger actualWithdraw = depositOthersManager.withdrawInner(value, this);
-        availableAmount = availableAmount.add(actualWithdraw);
+        depositOthersManager.withdrawInner(value, this);
         if (availableAmount.compareTo(value) < 0) {
             return false;
         }
@@ -173,8 +169,7 @@ public class ConsensusManager {
          * 若可用金额足够，则委托其他节点
          */
         if(availableAmount.compareTo(MIN_JOIN_DEPOSIT) >= 0) {
-            BigInteger actualDeposit = depositOthersManager.deposit(availableAmount);
-            availableAmount = availableAmount.subtract(actualDeposit);
+            depositOthersManager.deposit(availableAmount, this);
         }
         return true;
     }
@@ -215,6 +210,13 @@ public class ConsensusManager {
         this.availableAmount = availableAmount;
     }
 
+    public void addAvailableAmount(BigInteger availableAmount) {
+        this.availableAmount = this.availableAmount.add(availableAmount);
+    }
+    public void subAvailableAmount(BigInteger availableAmount) {
+        this.availableAmount = this.availableAmount.subtract(availableAmount);
+    }
+
     public void repairAmount(BigInteger value) {
         this.availableAmount = this.availableAmount.add(value);
     }
@@ -232,8 +234,7 @@ public class ConsensusManager {
 
     public void withdrawSpecifiedAmount(BigInteger value) {
         // 退出委托其他节点的金额
-        BigInteger actualWithdraw = depositOthersManager.withdrawInner(value, this);
-        availableAmount = availableAmount.add(actualWithdraw);
+        depositOthersManager.withdrawInner(value, this);
     }
 
     public void removeAgentInner(String agentHash) {
@@ -263,13 +264,17 @@ public class ConsensusManager {
             }
             if (!user.getAvailableAmount().equals(BigInteger.ZERO)) {
                 user.setRewardDebt(user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12));
+                user.setAgentAmount(BigInteger.ZERO);
+                user.setOpenNodeAward(false);
             } else {
                 userInfo.remove(userAddress);
             }
-            user.setAgentAmount(BigInteger.ZERO);
-            user.setOpenNodeAward(false);
         }
         agentDeposits.remove(agentHash);
+    }
+
+    public BigInteger consensusEmergencyWithdraw(String joinAgentHash) {
+        return depositOthersManager.consensusEmergencyWithdraw(joinAgentHash, this);
     }
 
     @Override
