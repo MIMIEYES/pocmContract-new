@@ -292,6 +292,12 @@ public class PocmContract extends Ownable implements Contract {
         consensusManager.repairAmount(value);
     }
 
+    public void repairConsensusDeposit(BigInteger value) {
+        onlyOffcial();
+        require(pi.openConsensus, "Consensus is not turned on");
+        consensusManager.repairConsensusDeposit(value);
+    }
+
     public void repairTotalDepositManager(BigInteger value) {
         onlyOffcial();
         totalDepositManager.repairAmount(value);

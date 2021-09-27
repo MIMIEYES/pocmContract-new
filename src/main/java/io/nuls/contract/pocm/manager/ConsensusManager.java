@@ -92,14 +92,14 @@ public class ConsensusManager {
 
 
     private void enableDepositOthers() {
-        require(!enableDepositOthers, "重复操作，已开启此功能");
+        require(!enableDepositOthers, "Repeat operation");
         enableDepositOthers = true;
         depositOthersManager = new DepositOthersManager();
         depositOthersManager.modifyMinJoinDeposit(MIN_JOIN_DEPOSIT);
     }
 
     public String[] addOtherAgent(String agentHash) {
-        require(enableDepositOthers, "未开启此功能");
+        require(enableDepositOthers, "This feature is not turned on");
         return depositOthersManager.addOtherAgent(agentHash);
     }
 
@@ -132,13 +132,13 @@ public class ConsensusManager {
      */
     public void depositManually() {
         BigInteger amount = availableAmount;
-        require(amount.compareTo(MIN_JOIN_DEPOSIT) >= 0, "可用金额不足以委托节点");
-        require(depositOthersManager.otherAgentsSize() > 0, "没有添加可委托的共识节点[0]");
+        require(amount.compareTo(MIN_JOIN_DEPOSIT) >= 0, "The available amount is not enough to stake the node");
+        require(depositOthersManager.otherAgentsSize() > 0, "No consensus node added");
         /**
          * 委托其他节点
          */
         BigInteger actualDeposit = depositOthersManager.deposit(availableAmount, this);
-        require(actualDeposit.compareTo(BigInteger.ZERO) > 0, "没有可委托的共识节点[1]");
+        require(actualDeposit.compareTo(BigInteger.ZERO) > 0, "All consensus nodes have been fully staked");
     }
 
     public Set<String> getAgents() {
@@ -179,7 +179,7 @@ public class ConsensusManager {
      */
     public void transferConsensusReward(Address beneficiary) {
         BigInteger availableAward = awardInfo.getAvailableAward();
-        require(availableAward.compareTo(BigInteger.ZERO) > 0, "无可用的共识奖励金额");
+        require(availableAward.compareTo(BigInteger.ZERO) > 0, "No consensus reward amount available");
         // 清零
         awardInfo.resetAvailableAward();
         beneficiary.transfer(availableAward);
@@ -219,6 +219,12 @@ public class ConsensusManager {
 
     public void repairAmount(BigInteger value) {
         this.availableAmount = this.availableAmount.add(value);
+    }
+
+    public void repairConsensusDeposit(BigInteger value) {
+        if(enableDepositOthers) {
+            this.depositOthersManager.repairDeposit(value);
+        }
     }
 
     public void modifyMinJoinDeposit(BigInteger value) {
@@ -291,6 +297,5 @@ public class ConsensusManager {
         sb.append('}');
         return sb.toString();
     }
-
 
 }

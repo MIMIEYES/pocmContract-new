@@ -2,6 +2,7 @@ package io.nuls.contract.pocm.ownership;
 
 import io.nuls.contract.pocm.manager.PocmInfo;
 import io.nuls.contract.pocm.util.AssetWrapper;
+import io.nuls.contract.pocm.util.CandyToken;
 import io.nuls.contract.pocm.util.NRC20Wrapper;
 import io.nuls.contract.sdk.Address;
 import io.nuls.contract.sdk.Event;
@@ -93,7 +94,12 @@ public class Ownable {
 
     public void transferProjectCandyAsset(Address to, BigInteger value) {
         onlyOwner();
-        AssetWrapper wrapper = new AssetWrapper(pi.candyAssetChainId, pi.candyAssetId);
+        CandyToken wrapper;
+        if (pi.candyAssetChainId + pi.candyAssetId == 0) {
+            wrapper = new NRC20Wrapper(pi.candyToken);
+        } else {
+            wrapper = new AssetWrapper(pi.candyAssetChainId, pi.candyAssetId);
+        }
         BigInteger balance = wrapper.balanceOf(Msg.address());
         require(balance.compareTo(value) >= 0, "No enough balance");
         wrapper.transfer(to, value);

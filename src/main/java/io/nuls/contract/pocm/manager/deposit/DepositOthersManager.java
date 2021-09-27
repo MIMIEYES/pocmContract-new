@@ -60,6 +60,10 @@ public class DepositOthersManager {
         return otherAgents.size();
     }
 
+    public void repairDeposit(BigInteger value) {
+        this.depositLockedAmount = this.depositLockedAmount.add(value);
+    }
+
     public Set<String> getAgents() {
         int size = otherAgents.size();
         if(size == 0) {
@@ -209,7 +213,7 @@ public class DepositOthersManager {
             BigInteger withdrawAmount;
             while (!expectWithdrawAmount.equals(BigInteger.ZERO)){
                 withdrawAmount = this.withdrawLoop(expectWithdrawAmount, consensusManager);
-                //actualWithdraw = actualWithdraw.add(withdrawAmount);
+                if (withdrawAmount.equals(BigInteger.ZERO)) break;
                 if(withdrawAmount.compareTo(expectWithdrawAmount) >= 0){
                     expectWithdrawAmount = BigInteger.ZERO;
                 }else{
@@ -286,12 +290,18 @@ public class DepositOthersManager {
     }
 
     private BigInteger withdrawLoop(BigInteger expectWithdrawAmount, ConsensusManager consensusManager){
+        if (depositList.size() == 0) {
+            return BigInteger.ZERO;
+        }
         ConsensusDepositInfo maxDeposit = depositList.getLast();
         BigInteger realWithdrawAmount = BigInteger.ZERO;
         //当退出金额大于最大的委托则退出最大委托；否则从小到大遍历找到大于退出金额的第一条委托记录
         if(expectWithdrawAmount.compareTo(maxDeposit.getDeposit()) >= 0){
-            depositList.removeLast();
             realWithdrawAmount = this.withdrawOneWithCheck(maxDeposit, consensusManager);
+            boolean depositRemoved = (realWithdrawAmount.compareTo(BigInteger.ZERO) < 0);
+            if (!depositRemoved) {
+                depositList.removeLast();
+            }
         }else{
             // 找出最小的一笔退出抵押的金额（使闲置金额最小）
             for(Iterator<ConsensusDepositInfo> iterator = depositList.iterator(); iterator.hasNext();){
