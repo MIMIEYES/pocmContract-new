@@ -619,7 +619,7 @@ public class PocmContract extends Ownable implements Contract {
         if (_amount.compareTo(BigInteger.ZERO) > 0) {
             sender.transfer(_amount);
         }
-        if (user.getAvailableAmount().equals(BigInteger.ZERO)) {
+        if (user.getAvailableAmount().equals(BigInteger.ZERO) && user.getAgentAmount().equals(BigInteger.ZERO)) {
             this.userInfo.remove(senderAddress);
         }
         // 提现事件
