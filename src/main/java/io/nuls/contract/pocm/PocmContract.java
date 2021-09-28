@@ -37,7 +37,7 @@ public class PocmContract extends Ownable implements Contract {
     private ConsensusManager consensusManager;// 共识管理器
     private CandyToken candyTokenWrapper;
     private boolean isAllocationToken = false;//项目是否初始分配了糖果token
-    private boolean isAcceptDeposit = false;//是否接受抵押
+    private boolean isAcceptStaking = false;//是否接受质押
     private boolean isNRC20Candy;//糖果是否是NRC20资产
     private Map<String, ConsensusAgentDepositInfo> agentDeposits = new HashMap<String, ConsensusAgentDepositInfo>();
 
@@ -48,7 +48,7 @@ public class PocmContract extends Ownable implements Contract {
      * @param candyPerBlock                     每个区块奖励的Token数量
      * @param amount                            糖果token分配总量
      * @param lockedTokenDay                    获取Token奖励的锁定天数
-     * @param minimumDeposit                    最低抵押NULS数量
+     * @param minimumStaking                    最低质押NULS数量
      * @param openConsensus                     是否开启合约共识
      * @param openAwardConsensusNodeProvider    是否奖励共识节点提供者
      * @param authorizationCode                 dapp的唯一识别码
@@ -59,7 +59,7 @@ public class PocmContract extends Ownable implements Contract {
                         BigInteger candyPerBlock,
                         BigInteger amount,
                         int lockedTokenDay,
-                        BigInteger minimumDeposit,
+                        BigInteger minimumStaking,
                         boolean openConsensus,
                         boolean openAwardConsensusNodeProvider,
                         String authorizationCode) {
@@ -78,7 +78,7 @@ public class PocmContract extends Ownable implements Contract {
         require(candyPerBlock.compareTo(BigInteger.ZERO) > 0, "initial: candyPerBlock not good");
         require(amount.compareTo(BigInteger.ZERO) > 0, "initial: amount not good");
         require(lockedTokenDay >= 0, "initial: lockedTokenDay not good");
-        require(minimumDeposit.compareTo(BigInteger.ZERO) > 0, "initial: minimumDeposit not good");
+        require(minimumStaking.compareTo(BigInteger.ZERO) > 0, "initial: minimumStaking not good");
 
         pi.candyToken = candyToken;
         pi.candyAssetChainId = candyAssetChainId;
@@ -86,7 +86,7 @@ public class PocmContract extends Ownable implements Contract {
         pi.candyPerBlock = candyPerBlock;
         pi.candySupply = amount;
         pi.lockedTokenDay = lockedTokenDay;
-        pi.minimumDeposit = minimumDeposit;
+        pi.minimumStaking = minimumStaking;
         this.totalDepositManager = new TotalDepositManager();
         if (openConsensus) {
             openConsensusInner();
@@ -136,7 +136,7 @@ public class PocmContract extends Ownable implements Contract {
 
     @Payable
     public void depositForOwn() {
-        require(isAllocationToken() && isAcceptDeposit(), "No enough candy token in the contract");
+        require(isAllocationToken() && isAcceptStaking(), "No enough candy token in the contract");
         require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
         Address sender = Msg.sender();
         String senderAddress = sender.toString();
@@ -151,16 +151,16 @@ public class PocmContract extends Ownable implements Contract {
                 decimalValue = decimalValue.add(ONE_NULS);
             }
             _amount = _amount.subtract(decimalValue);
-            require(decimalValue.add(_amount).compareTo(Msg.value()) == 0, "Decimal parsing error, deposit: " + Msg.value());
+            require(decimalValue.add(_amount).compareTo(Msg.value()) == 0, "Decimal parsing error, staking: " + Msg.value());
         }
-        require(_amount.compareTo(pi.minimumDeposit) >= 0, "amount not good");
+        require(_amount.compareTo(pi.minimumStaking) >= 0, "amount not good");
         updatePool();
         if (user != null) {
             // 领取奖励
             this.receiveInternal(sender, user);
         }
 
-        // 90% available for deposit
+        // 90% available for staking
         BigDecimal bigDecimalValue = new BigDecimal(_amount);
         BigInteger availableAmount = AVAILABLE_PERCENT.multiply(bigDecimalValue).toBigInteger();
         long blockNumber = Block.number();
@@ -193,7 +193,7 @@ public class PocmContract extends Ownable implements Contract {
         require(address != null, "empty address");
         String addressStr = address.toString();
         UserInfo user = this.userInfo.get(addressStr);
-        require(user != null, "deposit user not exist");
+        require(user != null, "user not exist");
         updatePool();
         this.receiveInternal(address, user);
         user.setRewardDebt(user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12));
@@ -229,17 +229,17 @@ public class PocmContract extends Ownable implements Contract {
     public void updateTotalAllocation() {
         BigInteger balance = candyTokenWrapper.balanceOf(Msg.address());
         if (balance.compareTo(BigInteger.ZERO) > 0) {
-            this.isAcceptDeposit = true;
+            this.isAcceptStaking = true;
         } else {
-            this.isAcceptDeposit = false;
+            this.isAcceptStaking = false;
         }
     }
 
     public void clearContract() {
         onlyOwner();
         BigInteger balance = Msg.address().balance();
-        require(balance.compareTo(ONE_NULS) <= 0, "余额不得大于1NULS");
-        require(balance.compareTo(BigInteger.ZERO) > 0, "余额为零，无需清空");
+        require(balance.compareTo(ONE_NULS) <= 0, "The balance cannot be greater than 1 NULS");
+        require(balance.compareTo(BigInteger.ZERO) > 0, "The balance is zero, no need to clear");
         contractCreator.transfer(balance);
     }
 
@@ -328,7 +328,7 @@ public class PocmContract extends Ownable implements Contract {
     public void addOtherAgent(String agentHash) {
         onlyOwnerOrOffcial();
         require(pi.openConsensus, "Consensus is not turned on");
-        require(isAllocationToken() && isAcceptDeposit(), "No enough candy token in the contract");
+        require(isAllocationToken() && isAcceptStaking(), "No enough candy token in the contract");
         String[] agentInfo = consensusManager.addOtherAgent(agentHash);
         String agentAddress = agentInfo[0];
         Collection<ConsensusAgentDepositInfo> agentDepositInfos = agentDeposits.values();
@@ -443,8 +443,8 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     @View
-    public BigInteger minimumDeposit() {
-        return pi.minimumDeposit;
+    public BigInteger minimumStaking() {
+        return pi.minimumStaking;
     }
 
     @View
@@ -471,7 +471,7 @@ public class PocmContract extends Ownable implements Contract {
      */
     @View
     public String ownerAvailableConsensusAward() {
-        require(pi.openConsensus, "未开启共识功能");
+        require(pi.openConsensus, "Consensus is not turned on");
         return consensusManager.getAvailableConsensusReward().toString();
     }
 
@@ -480,7 +480,7 @@ public class PocmContract extends Ownable implements Contract {
      */
     @View
     public String ownerTotalConsensusAward() {
-        require(pi.openConsensus, "未开启共识功能");
+        require(pi.openConsensus, "Consensus is not turned on");
         return consensusManager.getAvailableConsensusReward().add(consensusManager.getTransferedConsensusReward()).toString();
     }
 
@@ -489,13 +489,13 @@ public class PocmContract extends Ownable implements Contract {
      */
     @View
     public String freeAmountForConsensusDeposit() {
-        require(pi.openConsensus, "未开启共识功能");
+        require(pi.openConsensus, "Consensus is not turned on");
         return consensusManager.getAvailableAmount().toString();
     }
 
     @View
     public String getMinJoinDeposit() {
-        require(pi.openConsensus, "未开启共识功能");
+        require(pi.openConsensus, "Consensus is not turned on");
         return consensusManager.getMinJoinDeposit().toString();
     }
 
@@ -528,14 +528,14 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     /**
-     * 领取抵押者参与抵押的交易未领取的收益
+     * 领取质押者参与质押的交易未领取的收益
      *
-     * @param depositorAddress 抵押者账户地址
+     * @param stakingAddress 质押者账户地址
      * @return
      */
     @View
-    public String calcUnReceiveAwards(@Required Address depositorAddress, String unused) {
-        return this.pendingToken(depositorAddress);
+    public String calcUnReceiveAwards(@Required Address stakingAddress, String unused) {
+        return this.pendingToken(stakingAddress);
     }
 
     /**
@@ -586,7 +586,7 @@ public class PocmContract extends Ownable implements Contract {
                     amount = pending;
                 } else {
                     amount = candyBalance;
-                    this.isAcceptDeposit = false;
+                    this.isAcceptStaking = false;
                 }
                 // 发放的奖励 + 已发放的奖励 <= 糖果发行量
                 BigInteger limitCandy = pi.candySupply.subtract(this.allocationAmount);
@@ -612,7 +612,7 @@ public class PocmContract extends Ownable implements Contract {
 
         BigInteger available = AVAILABLE_PERCENT.multiply(new BigDecimal(_amount)).toBigInteger();
         boolean isEnoughBalance = totalDepositManager.subtract(available);
-        require(isEnoughBalance, "The balance is not enough to refund the deposit, please contact the project party, the deposit: " + available);
+        require(isEnoughBalance, "The balance is not enough to refund the staking, please contact the project party, the staking: " + available);
         user.subAmount(_amount, available);
         pi.lpSupply = pi.lpSupply.subtract(available);
         user.setRewardDebt(user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12));
@@ -631,14 +631,14 @@ public class PocmContract extends Ownable implements Contract {
         BigInteger _amount = user.getAmount();
         BigInteger available = AVAILABLE_PERCENT.multiply(new BigDecimal(_amount)).toBigInteger();
         boolean isEnoughBalance = totalDepositManager.subtract(available);
-        require(isEnoughBalance, "The balance is not enough to refund the deposit, please contact the project party, the deposit: " + available);
+        require(isEnoughBalance, "The balance is not enough to refund the staking, please contact the project party, the staking: " + available);
         if (_amount.compareTo(BigInteger.ZERO) > 0) {
             sender.transfer(_amount);
             user.subAmount(_amount, available);
             // 紧急提现，退出抵押事件，避免节点创建者紧急提现，QuitDepositEvent的事件在后台可能会把正常抵押删除
-            List<Long> depositNumbers = new ArrayList<Long>();
-            depositNumbers.add(0L);
-            emit(new QuitDepositEvent(depositNumbers, senderAddress));
+            List<Long> stakingNumbers = new ArrayList<Long>();
+            stakingNumbers.add(0L);
+            emit(new QuitDepositEvent(stakingNumbers, senderAddress));
         }
         if (user.getAvailableAmount().equals(BigInteger.ZERO)) {
             this.userInfo.remove(senderAddress);
@@ -649,8 +649,8 @@ public class PocmContract extends Ownable implements Contract {
         pi.lpSupply = pi.lpSupply.subtract(available);
     }
 
-    private boolean isAcceptDeposit() {
-        return isAcceptDeposit;
+    private boolean isAcceptStaking() {
+        return isAcceptStaking;
     }
 
     private boolean unreachedLimitCandySupply() {
@@ -662,7 +662,7 @@ public class PocmContract extends Ownable implements Contract {
             BigInteger balance = candyTokenWrapper.balanceOf(Msg.address());
             if (balance.compareTo(pi.candySupply) >= 0) {
                 isAllocationToken = true;
-                isAcceptDeposit = true;
+                isAcceptStaking = true;
             }
         }
         return isAllocationToken;

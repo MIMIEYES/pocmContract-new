@@ -24,12 +24,9 @@
 package io.nuls.contract.pocm.util;
 
 import io.nuls.contract.sdk.Address;
-import io.nuls.contract.sdk.Msg;
-import io.nuls.contract.sdk.MultyAssetValue;
 
 import java.math.BigInteger;
 
-import static io.nuls.contract.sdk.Utils.require;
 import static io.nuls.contract.sdk.Utils.revert;
 
 /**

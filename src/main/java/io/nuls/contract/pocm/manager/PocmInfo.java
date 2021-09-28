@@ -47,7 +47,7 @@ public class PocmInfo {
     public BigInteger candySupply;// 糖果发行总量
     public int lockedTokenDay;// 获取Token奖励的锁定天数
     public long lockedTime;
-    public BigInteger minimumDeposit;// 最低抵押na数量(1亿个na等于1个NULS）
+    public BigInteger minimumStaking;// 最低质押na数量(1亿个na等于1个NULS）
     public boolean openConsensus = false;//是否开启合约共识功能
     public boolean openAwardConsensusNodeProvider = false;//是否奖励共识节点提供者
     public String authorizationCode;//dapp的唯一识别码

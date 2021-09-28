@@ -254,8 +254,6 @@ public class ConsensusManager {
 
         String userAddress = agentDepositInfo.getDepositorAddress();
         UserInfo user = userInfo.get(userAddress);
-        //TODO pierre user断言，测试完成后移除
-        require(user != null, "user not exist");
         if (user != null) {
             // 存在抵押记录，领取奖励
             pocmContract.receiveAwardsByAddress(new Address(userAddress));

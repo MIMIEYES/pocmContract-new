@@ -1,9 +1,6 @@
 package io.nuls.contract.pocm.util;
 
 import io.nuls.contract.sdk.Address;
-import io.nuls.contract.sdk.Event;
-import io.nuls.contract.sdk.annotation.Required;
-import io.nuls.contract.sdk.annotation.View;
 
 import java.math.BigInteger;
 
