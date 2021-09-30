@@ -6,13 +6,13 @@ import io.nuls.contract.sdk.Event;
  * @author: tag0313
  * @date: 2019-09-16
  */
-public class RemoveAgentEvent implements Event {
+public class PocmRemoveAgentEvent implements Event {
     private String hash;
 
-    public RemoveAgentEvent() {
+    public PocmRemoveAgentEvent() {
     }
 
-    public RemoveAgentEvent(String hash) {
+    public PocmRemoveAgentEvent(String hash) {
         this.hash = hash;
     }
 

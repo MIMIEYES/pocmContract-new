@@ -31,35 +31,22 @@ import java.math.BigInteger;
  * @author: PierreLuo
  * @date: 2019-08-18
  */
-public class AgentEvent implements Event {
+public class PocmCandySupplyEvent implements Event {
 
-    private String hash;
+    private BigInteger supply;
 
-    private BigInteger value;
-
-
-
-    public AgentEvent() {
+    public PocmCandySupplyEvent() {
     }
 
-    public AgentEvent(String hash, BigInteger value) {
-        this.hash = hash;
-        this.value=value;
+    public PocmCandySupplyEvent(BigInteger supply) {
+        this.supply = supply;
     }
 
-    public String getHash() {
-        return hash;
+    public BigInteger getSupply() {
+        return supply;
     }
 
-    public void setHash(String hash) {
-        this.hash = hash;
-    }
-
-    public BigInteger getValue() {
-        return value;
-    }
-
-    public void setValues(BigInteger value) {
-        this.value = value;
+    public void setSupply(BigInteger supply) {
+        this.supply = supply;
     }
 }

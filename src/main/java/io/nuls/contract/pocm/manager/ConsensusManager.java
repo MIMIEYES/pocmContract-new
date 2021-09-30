@@ -24,7 +24,7 @@
 package io.nuls.contract.pocm.manager;
 
 import io.nuls.contract.pocm.PocmContract;
-import io.nuls.contract.pocm.event.RemoveAgentEvent;
+import io.nuls.contract.pocm.event.PocmRemoveAgentEvent;
 import io.nuls.contract.pocm.manager.deposit.DepositOthersManager;
 import io.nuls.contract.pocm.model.ConsensusAgentDepositInfo;
 import io.nuls.contract.pocm.model.ConsensusAwardInfo;
@@ -246,7 +246,7 @@ public class ConsensusManager {
     public void removeAgentInner(String agentHash) {
         require(pi.openConsensus, "Consensus is not turned on");
         this.remove(agentHash);
-        emit(new RemoveAgentEvent(agentHash));
+        emit(new PocmRemoveAgentEvent(agentHash));
 
         //1.共识节点的创建者先领取奖励
         ConsensusAgentDepositInfo agentDepositInfo = agentDeposits.get(agentHash);

@@ -72,6 +72,7 @@ public class Ownable {
      */
     public void transferOwnership(Address newOwner) {
         onlyOwner();
+        require(newOwner != null, "Empty new owner");
         emit(new OwnershipTransferredEvent(owner, newOwner));
         owner = newOwner;
     }
@@ -79,7 +80,7 @@ public class Ownable {
 
     @Payable
     public void repairBalance() {
-        onlyOwnerOrOffcial();
+        onlyOffcial();
     }
 
     public void transferOtherNRC20(@Required Address nrc20, @Required Address to, @Required BigInteger value) {

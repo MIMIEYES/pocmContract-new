@@ -46,7 +46,7 @@ public class PocmContract extends Ownable implements Contract {
      * @param candyAssetChainId                 糖果资产链ID（非NRC20资产，和`candyToken`不能同时存在）
      * @param candyAssetId                      糖果资产ID（非NRC20资产，和`candyToken`不能同时存在）
      * @param candyPerBlock                     每个区块奖励的Token数量
-     * @param amount                            糖果token分配总量
+     * @param candySupply                       糖果token分配总量
      * @param lockedTokenDay                    获取Token奖励的锁定天数
      * @param minimumStaking                    最低质押NULS数量
      * @param openConsensus                     是否开启合约共识
@@ -57,7 +57,7 @@ public class PocmContract extends Ownable implements Contract {
                         int candyAssetChainId,
                         int candyAssetId,
                         BigInteger candyPerBlock,
-                        BigInteger amount,
+                        BigInteger candySupply,
                         int lockedTokenDay,
                         BigInteger minimumStaking,
                         boolean openConsensus,
@@ -76,15 +76,18 @@ public class PocmContract extends Ownable implements Contract {
             this.candyTokenWrapper = new AssetWrapper(candyAssetChainId, candyAssetId);
         }
         require(candyPerBlock.compareTo(BigInteger.ZERO) > 0, "initial: candyPerBlock not good");
-        require(amount.compareTo(BigInteger.ZERO) > 0, "initial: amount not good");
+        require(candySupply.compareTo(BigInteger.ZERO) > 0, "initial: candySupply not good");
         require(lockedTokenDay >= 0, "initial: lockedTokenDay not good");
         require(minimumStaking.compareTo(BigInteger.ZERO) > 0, "initial: minimumStaking not good");
+        BigInteger decimalValue = PocmUtil.extractDecimal(minimumStaking);
+        boolean hasDecimal = decimalValue.compareTo(BigInteger.ZERO) > 0;
+        require(!hasDecimal, "initial: minimumStaking not good, floating point numbers are not allowed");
 
         pi.candyToken = candyToken;
         pi.candyAssetChainId = candyAssetChainId;
         pi.candyAssetId = candyAssetId;
         pi.candyPerBlock = candyPerBlock;
-        pi.candySupply = amount;
+        pi.candySupply = candySupply;
         pi.lockedTokenDay = lockedTokenDay;
         pi.minimumStaking = minimumStaking;
         this.totalDepositManager = new TotalDepositManager();
@@ -98,6 +101,13 @@ public class PocmContract extends Ownable implements Contract {
         pi.lockedTime = pi.lockedTokenDay * pi.TIMEPERDAY;
         pi.lastRewardBlock = Block.number();
         setPocmInfo(pi);
+        emit(new PocmCreateContractEvent(
+                isNRC20Candy ? candyToken.toString() : null,
+                candyAssetChainId, candyAssetId,
+                candyPerBlock, candySupply,
+                lockedTokenDay,
+                minimumStaking,
+                openConsensus, openAwardConsensusNodeProvider, authorizationCode));
     }
 
     @Override
@@ -132,6 +142,7 @@ public class PocmContract extends Ownable implements Contract {
     public void addCandySupply(BigInteger _amount) {
         onlyOwnerOrOffcial();
         pi.candySupply = pi.candySupply.add(_amount);
+        emit(new PocmCandySupplyEvent(pi.candySupply));
     }
 
     @Payable
@@ -281,7 +292,7 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     public void consensusWithdrawSpecifiedAmount(BigInteger value) {
-        onlyOwnerOrOffcial();
+        onlyOffcial();
         require(pi.openConsensus, "Consensus is not turned on");
         consensusManager.withdrawSpecifiedAmount(value);
     }
@@ -336,7 +347,7 @@ public class PocmContract extends Ownable implements Contract {
             require(!agentDepositInfo.getDepositorAddress().equals(agentAddress), "The creator address of the node being added conflicts with the creator address of the added node");
         }
         BigInteger agentValue = new BigInteger(agentInfo[3]);
-        emit(new AgentEvent(agentHash, agentValue));
+        emit(new PocmAgentEvent(agentHash, agentValue, pi.openAwardConsensusNodeProvider));
         BigInteger availableValue = agentValue;
         // 不给节点提供者奖励
         if (!pi.openAwardConsensusNodeProvider) {
@@ -623,7 +634,7 @@ public class PocmContract extends Ownable implements Contract {
             this.userInfo.remove(senderAddress);
         }
         // 提现事件
-        emit(new Withdraw(senderAddress, _amount.toString()));
+        emit(new PocmWithdrawEvent(senderAddress, _amount.toString()));
     }
 
     private void emergencyWithdrawByUser(Address sender, UserInfo user) {
@@ -638,7 +649,7 @@ public class PocmContract extends Ownable implements Contract {
             // 紧急提现，退出抵押事件，避免节点创建者紧急提现，QuitDepositEvent的事件在后台可能会把正常抵押删除
             List<Long> stakingNumbers = new ArrayList<Long>();
             stakingNumbers.add(0L);
-            emit(new QuitDepositEvent(stakingNumbers, senderAddress));
+            emit(new PocmQuitDepositEvent(stakingNumbers, senderAddress));
         }
         if (user.getAvailableAmount().equals(BigInteger.ZERO)) {
             this.userInfo.remove(senderAddress);

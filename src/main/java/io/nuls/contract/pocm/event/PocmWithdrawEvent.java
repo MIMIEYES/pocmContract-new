@@ -29,14 +29,14 @@ import io.nuls.contract.sdk.Event;
  * @author: PierreLuo
  * @date: 2021/8/31
  */
-public class Withdraw implements Event {
+public class PocmWithdrawEvent implements Event {
     String user;
     String amount;
 
-    public Withdraw() {
+    public PocmWithdrawEvent() {
     }
 
-    public Withdraw(String user, String amount) {
+    public PocmWithdrawEvent(String user, String amount) {
         this.user = user;
         this.amount = amount;
     }

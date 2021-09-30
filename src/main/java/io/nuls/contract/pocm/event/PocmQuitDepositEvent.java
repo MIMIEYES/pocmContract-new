@@ -9,14 +9,14 @@ import java.util.List;
  * @author: PierreLuo
  * @date: 2021/9/3
  */
-public class QuitDepositEvent implements Event {
+public class PocmQuitDepositEvent implements Event {
     private List<Long> depositNumbers;
     private String  depositorAddress;
 
-    public QuitDepositEvent() {
+    public PocmQuitDepositEvent() {
     }
 
-    public QuitDepositEvent(List<Long> depositNumbers, String depositorAddress) {
+    public PocmQuitDepositEvent(List<Long> depositNumbers, String depositorAddress) {
         this.depositNumbers = depositNumbers;
         this.depositorAddress = depositorAddress;
     }

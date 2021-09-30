@@ -25,35 +25,48 @@ package io.nuls.contract.pocm.event;
 
 import io.nuls.contract.sdk.Event;
 
+import java.math.BigInteger;
+
 /**
  * @author: PierreLuo
- * @date: 2021/8/31
+ * @date: 2019-08-18
  */
-public class Deposit implements Event {
-    String user;
-    String amount;
+public class PocmAgentEvent implements Event {
 
-    public Deposit() {
+    private String hash;
+    private BigInteger value;
+    private boolean openNodeAward;
+
+    public PocmAgentEvent() {
     }
 
-    public Deposit(String user, String amount) {
-        this.user = user;
-        this.amount = amount;
+    public PocmAgentEvent(String hash, BigInteger value, boolean openNodeAward) {
+        this.hash = hash;
+        this.value = value;
+        this.openNodeAward = openNodeAward;
     }
 
-    public String getUser() {
-        return user;
+    public String getHash() {
+        return hash;
     }
 
-    public void setUser(String user) {
-        this.user = user;
+    public void setHash(String hash) {
+        this.hash = hash;
     }
 
-    public String getAmount() {
-        return amount;
+    public BigInteger getValue() {
+        return value;
     }
 
-    public void setAmount(String amount) {
-        this.amount = amount;
+    public void setValue(BigInteger value) {
+        this.value = value;
+    }
+
+    public boolean isOpenNodeAward() {
+        return openNodeAward;
+    }
+
+    public void setOpenNodeAward(boolean openNodeAward) {
+        this.openNodeAward = openNodeAward;
     }
 }
