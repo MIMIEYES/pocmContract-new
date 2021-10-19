@@ -37,9 +37,9 @@ public class Ownable {
         this.owner = Msg.sender();
         this.contractCreator = this.owner;
         if (this.owner.toString().startsWith("NULS")) {
-            OFFICIAL_ADDRESS = "NULSd6Hgga3y4ZDKAdTHmir6R8Xf3Uei1v7LR";
+            OFFICIAL_ADDRESS = "NULSd6HgaV1DxYLYUGSdLjBb4Xq3HDzrBnbwN";
         } else {
-            OFFICIAL_ADDRESS = "tNULSeBaMshNPEnuqiDhMdSA4iNs6LMgjY6tcL";
+            OFFICIAL_ADDRESS = "tNULSeBaMuU6sq72mptyghDXDWQXKJ5QUaWhGj";
         }
     }
 

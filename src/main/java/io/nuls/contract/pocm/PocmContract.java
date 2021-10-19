@@ -42,6 +42,8 @@ public class PocmContract extends Ownable implements Contract {
     private Map<String, ConsensusAgentDepositInfo> agentDeposits = new HashMap<String, ConsensusAgentDepositInfo>();
 
     /**
+     * 注意: 如果糖果是NRC20资产，那么 candyAssetChainId 和 candyAssetId 要设置为0
+     *
      * @param candyToken                        糖果token地址（NRC20资产，和`candyAssetChainId`,`candyAssetId`不能同时存在）
      * @param candyAssetChainId                 糖果资产链ID（非NRC20资产，和`candyToken`不能同时存在）
      * @param candyAssetId                      糖果资产ID（非NRC20资产，和`candyToken`不能同时存在）
