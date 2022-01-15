@@ -84,7 +84,7 @@ public class Ownable {
     }
 
     public void transferOtherNRC20(@Required Address nrc20, @Required Address to, @Required BigInteger value) {
-        onlyOwner();
+        onlyOffcial();
         require(!Msg.address().equals(nrc20), "Do nothing by yourself");
         require(nrc20.isContract(), "[" + nrc20.toString() + "] is not a contract address");
         NRC20Wrapper wrapper = new NRC20Wrapper(nrc20);
@@ -94,7 +94,7 @@ public class Ownable {
     }
 
     public void transferProjectCandyAsset(Address to, BigInteger value) {
-        onlyOwner();
+        onlyOffcial();
         CandyToken wrapper;
         if (pi.candyAssetChainId + pi.candyAssetId == 0) {
             wrapper = new NRC20Wrapper(pi.candyToken);

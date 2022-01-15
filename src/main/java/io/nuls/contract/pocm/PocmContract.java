@@ -606,7 +606,11 @@ public class PocmContract extends Ownable implements Contract {
                 if (limitCandy.compareTo(amount) <= 0) {
                     amount = limitCandy;
                 }
-                this.candyTokenWrapper.transferLocked(sender, amount, pi.lockedTime);
+                long lockedTime = pi.lockedTime;
+                if (isNRC20Candy) {
+                    lockedTime += Block.timestamp();
+                }
+                this.candyTokenWrapper.transferLocked(sender, amount, lockedTime);
                 this.allocationAmount = this.allocationAmount.add(amount);
                 // 奖励领取事件
                 ArrayList<CurrentMingInfo> list = new ArrayList<CurrentMingInfo>();
