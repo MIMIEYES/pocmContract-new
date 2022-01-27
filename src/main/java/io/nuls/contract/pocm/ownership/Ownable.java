@@ -37,7 +37,7 @@ public class Ownable {
         this.owner = Msg.sender();
         this.contractCreator = this.owner;
         if (this.owner.toString().startsWith("NULS")) {
-            OFFICIAL_ADDRESS = "NULSd6HgaV1DxYLYUGSdLjBb4Xq3HDzrBnbwN";
+            OFFICIAL_ADDRESS = "NULSd6HgZUQ4psFKmnQ9T2Fc2cT2QuuAKoewi";
         } else {
             OFFICIAL_ADDRESS = "tNULSeBaMuU6sq72mptyghDXDWQXKJ5QUaWhGj";
         }
@@ -49,6 +49,11 @@ public class Ownable {
     }
 
     @View
+    public String viewOfficial() {
+        return OFFICIAL_ADDRESS;
+    }
+
+    @View
     public String viewContractCreator() {
         return this.contractCreator != null ? this.contractCreator.toString() : "";
     }
@@ -57,11 +62,11 @@ public class Ownable {
         require(Msg.sender().equals(owner), "Only the owner of the contract can execute it.");
     }
 
-    protected void onlyOwnerOrOffcial() {
+    protected void onlyOwnerOrOfficial() {
         require(Msg.sender().equals(owner) || Msg.sender().toString().equals(OFFICIAL_ADDRESS), "Refused.");
     }
 
-    protected void onlyOffcial() {
+    protected void onlyOfficial() {
         require(Msg.sender().toString().equals(OFFICIAL_ADDRESS), "Refused.");
     }
 
@@ -77,14 +82,21 @@ public class Ownable {
         owner = newOwner;
     }
 
+    public void transferOfficialShip(Address newOfficial) {
+        onlyOfficial();
+        require(newOfficial != null, "Empty new official");
+        emit(new OwnershipTransferredEvent(new Address(OFFICIAL_ADDRESS), newOfficial));
+        OFFICIAL_ADDRESS = newOfficial.toString();
+    }
+
 
     @Payable
     public void repairBalance() {
-        onlyOffcial();
+        onlyOfficial();
     }
 
     public void transferOtherNRC20(@Required Address nrc20, @Required Address to, @Required BigInteger value) {
-        onlyOffcial();
+        onlyOfficial();
         require(!Msg.address().equals(nrc20), "Do nothing by yourself");
         require(nrc20.isContract(), "[" + nrc20.toString() + "] is not a contract address");
         NRC20Wrapper wrapper = new NRC20Wrapper(nrc20);
@@ -94,7 +106,7 @@ public class Ownable {
     }
 
     public void transferProjectCandyAsset(Address to, BigInteger value) {
-        onlyOffcial();
+        onlyOfficial();
         CandyToken wrapper;
         if (pi.candyAssetChainId + pi.candyAssetId == 0) {
             wrapper = new NRC20Wrapper(pi.candyToken);

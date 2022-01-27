@@ -29,7 +29,7 @@ import static io.nuls.contract.sdk.Utils.*;
 public class PocmContract extends Ownable implements Contract {
 
     // POCM合约修订版本
-    private final String VERSION = "V12";
+    private final String VERSION = "V13";
     private PocmInfo pi = new PocmInfo();// 合约基础信息
     private Map<String, UserInfo> userInfo = new HashMap<String, UserInfo>();
     private BigInteger allocationAmount = BigInteger.ZERO;//已经分配的Token数量
@@ -142,7 +142,7 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     public void addCandySupply(BigInteger _amount) {
-        onlyOwnerOrOffcial();
+        onlyOwnerOrOfficial();
         pi.candySupply = pi.candySupply.add(_amount);
         emit(new PocmCandySupplyEvent(pi.candySupply));
     }
@@ -261,58 +261,58 @@ public class PocmContract extends Ownable implements Contract {
      * 开启共识获得糖果奖励
      */
     public void openConsensusNodeAward() {
-        onlyOffcial();
+        onlyOfficial();
         pi.openAwardConsensusNodeProvider = true;
     }
     /**
      * 关闭共识获得糖果奖励
      */
     public void closeConsensusNodeAward() {
-        onlyOffcial();
+        onlyOfficial();
         pi.openAwardConsensusNodeProvider = false;
     }
     /**
      * 开启共识功能
      */
     public void openConsensus() {
-        onlyOffcial();
+        onlyOfficial();
         openConsensusInner();
     }
 
     public void closeConsensus() {
-        onlyOffcial();
+        onlyOfficial();
         require(pi.openConsensus, "Consensus has been turned off");
         pi.openConsensus = false;
         totalDepositManager.closeConsensus();
     }
 
     public void modifyMinJoinDeposit(BigInteger value) {
-        onlyOffcial();
+        onlyOfficial();
         require(pi.openConsensus, "Consensus is not turned on");
         require(value.compareTo(pi._2000_NULS) >= 0, "Amount too small");
         consensusManager.modifyMinJoinDeposit(value);
     }
 
     public void consensusWithdrawSpecifiedAmount(BigInteger value) {
-        onlyOffcial();
+        onlyOfficial();
         require(pi.openConsensus, "Consensus is not turned on");
         consensusManager.withdrawSpecifiedAmount(value);
     }
 
     public void repairConsensus(BigInteger value) {
-        onlyOffcial();
+        onlyOfficial();
         require(pi.openConsensus, "Consensus is not turned on");
         consensusManager.repairAmount(value);
     }
 
     public void repairConsensusDeposit(BigInteger value) {
-        onlyOffcial();
+        onlyOfficial();
         require(pi.openConsensus, "Consensus is not turned on");
         consensusManager.repairConsensusDeposit(value);
     }
 
     public void repairTotalDepositManager(BigInteger value) {
-        onlyOffcial();
+        onlyOfficial();
         totalDepositManager.repairAmount(value);
     }
 
@@ -339,7 +339,7 @@ public class PocmContract extends Ownable implements Contract {
      * @param agentHash 其他共识节点的hash
      */
     public void addOtherAgent(String agentHash) {
-        onlyOwnerOrOffcial();
+        onlyOwnerOrOfficial();
         require(pi.openConsensus, "Consensus is not turned on");
         require(isAllocationToken() && isAcceptStaking(), "No enough candy token in the contract");
         String[] agentInfo = consensusManager.addOtherAgent(agentHash);
@@ -384,12 +384,12 @@ public class PocmContract extends Ownable implements Contract {
      * @param agentHash 其他共识节点的hash
      */
     public void removeAgent(String agentHash) {
-        onlyOwnerOrOffcial();
+        onlyOwnerOrOfficial();
         consensusManager.removeAgentInner(agentHash);
     }
 
     public void quitAll() {
-        onlyOwnerOrOffcial();
+        onlyOwnerOrOfficial();
         require(consensusManager.getAgents() == null, "Please remove the consensus node first");
         boolean hasAgents = !agentDeposits.isEmpty();
         Set<String> skippedSet = new HashSet<String>();
@@ -410,7 +410,7 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     public void giveUpAll() {
-        onlyOffcial();
+        onlyOfficial();
         require(consensusManager.getAgents() == null, "Please remove the consensus node first");
         boolean hasAgents = !agentDeposits.isEmpty();
         Set<String> skippedSet = new HashSet<String>();
@@ -431,7 +431,7 @@ public class PocmContract extends Ownable implements Contract {
     }
 
     public BigInteger consensusEmergencyWithdraw(String joinAgentHash) {
-        onlyOffcial();
+        onlyOfficial();
         return consensusManager.consensusEmergencyWithdraw(joinAgentHash);
     }
 
