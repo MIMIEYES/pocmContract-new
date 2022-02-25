@@ -243,7 +243,11 @@ public class ConsensusManager {
         depositOthersManager.withdrawInner(value, this);
     }
 
-    public void removeAgentInner(String agentHash) {
+    public void emergencyRemoveAgentInner(String agentHash) {
+        this.removeAgentInner(agentHash, true);
+    }
+
+    private void removeAgentInner(String agentHash, boolean emergency) {
         require(pi.openConsensus, "Consensus is not turned on");
         this.remove(agentHash);
         emit(new PocmRemoveAgentEvent(agentHash));
@@ -255,8 +259,10 @@ public class ConsensusManager {
         String userAddress = agentDepositInfo.getDepositorAddress();
         UserInfo user = userInfo.get(userAddress);
         if (user != null) {
-            // 存在抵押记录，领取奖励
-            pocmContract.receiveAwardsByAddress(new Address(userAddress));
+            if (!emergency) {
+                // 存在抵押记录，领取奖励
+                pocmContract.receiveAwardsByAddress(new Address(userAddress));
+            }
 
             //2.共识节点的创建者退出
             BigInteger agentAmount = user.getAgentAmount();
@@ -264,9 +270,9 @@ public class ConsensusManager {
             // 如果共识节点有糖果奖励，扣减user的可用抵押金，扣减项目的总抵押金
             if (openNodeAward) {
                 user.subAmount(BigInteger.ZERO, agentAmount);
-                pi.lpSupply = pi.lpSupply.subtract(agentAmount);
+                pi.subLpSupply(agentAmount);
             }
-            if (!user.getAvailableAmount().equals(BigInteger.ZERO)) {
+            if (user.getAvailableAmount().compareTo(BigInteger.ZERO) > 0) {
                 user.setRewardDebt(user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12));
                 user.setAgentAmount(BigInteger.ZERO);
                 user.setOpenNodeAward(false);
@@ -275,6 +281,10 @@ public class ConsensusManager {
             }
         }
         agentDeposits.remove(agentHash);
+    }
+
+    public void removeAgentInner(String agentHash) {
+        this.removeAgentInner(agentHash, false);
     }
 
     public BigInteger consensusEmergencyWithdraw(String joinAgentHash) {

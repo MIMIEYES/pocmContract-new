@@ -23,7 +23,10 @@
  */
 package io.nuls.contract.pocm.manager;
 
+import io.nuls.contract.pocm.util.CandyToken;
 import io.nuls.contract.sdk.Address;
+import io.nuls.contract.sdk.Block;
+import io.nuls.contract.sdk.Msg;
 
 import java.math.BigInteger;
 
@@ -37,13 +40,15 @@ public class PocmInfo {
     public final long TIMEPERDAY = 86400;
     public BigInteger _2000_NULS = BigInteger.valueOf(200000000000L);
     public final BigInteger _1e12 = BigInteger.TEN.pow(12);
+    public CandyToken candyTokenWrapper;
     public Address candyToken; // Address of candy token contract.
     public int candyAssetChainId;// chainId of candy token contract.
     public int candyAssetId;// assetId of candy token contract.
+    public boolean isNRC20Candy;//糖果是否是NRC20资产
     public Long lastRewardBlock;  // Last block number that token distribution occurs.
     public BigInteger accPerShare;    // Accumulated token per share, times 1e12. See below.
     public BigInteger candyPerBlock;
-    public BigInteger lpSupply; // 抵押总量
+    private BigInteger lpSupply = BigInteger.ZERO; // 抵押总量
     public BigInteger candySupply;// 糖果发行总量
     public int lockedTokenDay;// 获取Token奖励的锁定天数
     public long lockedTime;
@@ -51,5 +56,31 @@ public class PocmInfo {
     public boolean openConsensus = false;//是否开启合约共识功能
     public boolean openAwardConsensusNodeProvider = false;//是否奖励共识节点提供者
     public String authorizationCode;//dapp的唯一识别码
+    public Long endBlock;// 池子结束高度
 
+    public void addLpSupply(BigInteger lpSupply) {
+        if (this.lpSupply.compareTo(BigInteger.ZERO) == 0 && lpSupply.compareTo(BigInteger.ZERO) > 0) {
+            BigInteger candyBalance = candyTokenWrapper.balanceOf(Msg.address());
+            BigInteger blockCount = candyBalance.divide(candyPerBlock);
+            this.endBlock = Block.number() + blockCount.longValue();
+        }
+        this.lpSupply = this.lpSupply.add(lpSupply);
+    }
+
+    public void subLpSupply(BigInteger lpSupply) {
+        this.lpSupply = this.lpSupply.subtract(lpSupply);
+        if (this.lpSupply.compareTo(BigInteger.ZERO) == 0) {
+            BigInteger candyBalance = candyTokenWrapper.balanceOf(Msg.address());
+            if (candyBalance.compareTo(BigInteger.ZERO) == 0) {
+                this.endBlock = Block.number();
+            } else {
+                // time: 127174492800 is 6000-01-01, blockCount = time/10 = 12717449280
+                this.endBlock = Block.number() + 12717449280L;
+            }
+        }
+    }
+
+    public BigInteger getLpSupply() {
+        return this.lpSupply;
+    }
 }

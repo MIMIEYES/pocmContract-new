@@ -211,9 +211,9 @@ public class DepositOthersManager {
             depositList.clear();
         } else {
             BigInteger withdrawAmount;
-            while (!expectWithdrawAmount.equals(BigInteger.ZERO)){
+            while (expectWithdrawAmount.compareTo(BigInteger.ZERO) > 0){
                 withdrawAmount = this.withdrawLoop(expectWithdrawAmount, consensusManager);
-                if (withdrawAmount.equals(BigInteger.ZERO)) break;
+                if (withdrawAmount.compareTo(BigInteger.ZERO) == 0) break;
                 if(withdrawAmount.compareTo(expectWithdrawAmount) >= 0){
                     expectWithdrawAmount = BigInteger.ZERO;
                 }else{
