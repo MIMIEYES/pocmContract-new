@@ -28,7 +28,7 @@ import static io.nuls.contract.sdk.Utils.*;
 public class PocmContract extends Ownable implements Contract {
 
     // POCM合约修订版本
-    private final String VERSION = "V14";
+    private final String VERSION = "V15";
     private PocmInfo pi = new PocmInfo();// 合约基础信息
     private Map<String, UserInfo> userInfo = new HashMap<String, UserInfo>();
     private BigInteger allocationAmount = BigInteger.ZERO;//已经分配的Token数量
@@ -98,7 +98,7 @@ public class PocmContract extends Ownable implements Contract {
         pi.accPerShare = BigInteger.ZERO;
         pi.lockedTime = pi.lockedTokenDay * pi.TIMEPERDAY;
         pi.lastRewardBlock = Block.number();
-        pi.endBlock = Block.number() + candySupply.divide(candyPerBlock).longValue();
+        pi.endBlock = Block.number() + 12717449280L;
         setPocmInfo(pi);
         emit(new PocmCreateContractEvent(
                 pi.isNRC20Candy ? candyToken.toString() : null,
@@ -146,7 +146,8 @@ public class PocmContract extends Ownable implements Contract {
 
     @Payable
     public void depositForOwn() {
-        require(isAllocationToken() && isAcceptStaking(), "No enough candy token in the contract");
+        require(isAllocationToken(), "No enough candy token in the contract");
+        require(isAcceptStaking(), "Cannot staking, please check the contract");
         require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
         Address sender = Msg.sender();
         String senderAddress = sender.toString();
@@ -724,11 +725,11 @@ public class PocmContract extends Ownable implements Contract {
         if (blockNumber <= pi.lastRewardBlock) {
             return;
         }
-        blockNumber = blockNumber < pi.endBlock ? blockNumber : pi.endBlock;
         if (pi.getLpSupply().compareTo(BigInteger.ZERO) == 0) {
             pi.lastRewardBlock = blockNumber;
             return;
         }
+        blockNumber = blockNumber < pi.endBlock ? blockNumber : pi.endBlock;
         BigInteger reward = BigInteger.valueOf(blockNumber - pi.lastRewardBlock).multiply(pi.candyPerBlock);
         pi.accPerShare = pi.accPerShare.add(reward.multiply(pi._1e12).divide(pi.getLpSupply()));
         pi.lastRewardBlock = blockNumber;
