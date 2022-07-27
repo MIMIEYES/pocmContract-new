@@ -53,10 +53,12 @@ public class PocmInfo {
     public int lockedTokenDay;// 获取Token奖励的锁定天数
     public long lockedTime;
     public BigInteger minimumStaking;// 最低质押na数量(1亿个na等于1个NULS）
+    public BigInteger maximumStaking;// 最高质押na数量(1亿个na等于1个NULS）
     public boolean openConsensus = false;//是否开启合约共识功能
     public boolean openAwardConsensusNodeProvider = false;//是否奖励共识节点提供者
     public String authorizationCode;//dapp的唯一识别码
     public Long endBlock;// 池子结束高度
+    public BigInteger c = BigInteger.TEN;
 
     public void addLpSupply(BigInteger lpSupply) {
         if (this.lpSupply.compareTo(BigInteger.ZERO) == 0 && lpSupply.compareTo(BigInteger.ZERO) > 0) {

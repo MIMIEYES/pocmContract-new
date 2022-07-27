@@ -33,7 +33,7 @@ public class UserInfo {
 
     private BigInteger amount;
     private BigInteger rewardDebt;
-    private BigInteger availableAmount;// 0.9
+    private BigInteger availableAmount;// 100%
     private long lastDepositHeight;// last deposit height
     private BigInteger agentAmount;//共识保证金数量
     private boolean openNodeAward;//共识节点是否可获得糖果奖励

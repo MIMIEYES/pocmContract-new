@@ -21,31 +21,32 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package io.nuls.contract.pocm.util;
+package io.nuls.contract.pocm.event;
 
-import java.math.BigDecimal;
+import io.nuls.contract.sdk.Event;
+
 import java.math.BigInteger;
 
 /**
  * @author: PierreLuo
- * @date: 2021/8/31
+ * @date: 2022/7/27
  */
-public class PocmUtil {
+public class PocmMaximumDepositEvent implements Event {
 
-    public final static BigInteger MININUM_TRANSFER_AMOUNT = BigInteger.TEN.pow(6);
+    private BigInteger maximumDeposit;
 
-    public final static BigInteger ONE_NULS = BigInteger.valueOf(100000000L);
-    //90%
-    public final static BigDecimal AVAILABLE_PERCENT = new BigDecimal("0.9");
-    //100%
-    public final static BigDecimal FULL_PERCENT = new BigDecimal("1");
-
-    public static BigDecimal toNuls(BigInteger na) {
-        return new BigDecimal(na).movePointLeft(8);
+    public PocmMaximumDepositEvent() {
     }
 
-    public static BigInteger extractDecimal(BigInteger na) {
-        return na.subtract(toNuls(na).toBigInteger().multiply(ONE_NULS));
+    public PocmMaximumDepositEvent(BigInteger maximumDeposit) {
+        this.maximumDeposit = maximumDeposit;
     }
 
+    public BigInteger getMaximumDeposit() {
+        return maximumDeposit;
+    }
+
+    public void setMaximumDeposit(BigInteger maximumDeposit) {
+        this.maximumDeposit = maximumDeposit;
+    }
 }

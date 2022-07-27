@@ -177,12 +177,15 @@ public class ConsensusManager {
     /**
      * 转移共识奖励金额
      */
-    public void transferConsensusReward(Address beneficiary) {
+    public BigInteger transferConsensusReward(Address beneficiary) {
         BigInteger availableAward = awardInfo.getAvailableAward();
         require(availableAward.compareTo(BigInteger.ZERO) > 0, "No consensus reward amount available");
         // 清零
         awardInfo.resetAvailableAward();
-        beneficiary.transfer(availableAward);
+        BigInteger b = BigInteger.valueOf(100);
+        BigInteger project = availableAward.multiply(b.subtract(pi.c)).divide(b);
+        beneficiary.transfer(project);
+        return availableAward.subtract(project);
     }
 
     /**

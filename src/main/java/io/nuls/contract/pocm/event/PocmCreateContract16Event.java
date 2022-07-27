@@ -2,10 +2,9 @@ package io.nuls.contract.pocm.event;
 
 import io.nuls.contract.sdk.Event;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
 
-public class PocmCreateContractEvent implements Event {
+public class PocmCreateContract16Event implements Event {
     private String tokenAddress;
     private int candyAssetChainId;
     private int candyAssetId;
@@ -13,11 +12,12 @@ public class PocmCreateContractEvent implements Event {
     private BigInteger candySupply;
     private int lockedTokenDay;
     private BigInteger minimumStaking;
+    private BigInteger maximumStaking;
     private boolean openConsensus;
     boolean openAwardConsensusNodeProvider;
     private String authorizationCode;
 
-    public PocmCreateContractEvent(String tokenAddress, int candyAssetChainId, int candyAssetId, BigInteger candyPerBlock, BigInteger candySupply, int lockedTokenDay, BigInteger minimumStaking, boolean openConsensus, boolean openAwardConsensusNodeProvider, String authorizationCode) {
+    public PocmCreateContract16Event(String tokenAddress, int candyAssetChainId, int candyAssetId, BigInteger candyPerBlock, BigInteger candySupply, int lockedTokenDay, BigInteger minimumStaking, BigInteger maximumStaking, boolean openConsensus, boolean openAwardConsensusNodeProvider, String authorizationCode) {
         this.tokenAddress = tokenAddress;
         this.candyAssetChainId = candyAssetChainId;
         this.candyAssetId = candyAssetId;
@@ -25,6 +25,7 @@ public class PocmCreateContractEvent implements Event {
         this.candySupply = candySupply;
         this.lockedTokenDay = lockedTokenDay;
         this.minimumStaking = minimumStaking;
+        this.maximumStaking = maximumStaking;
         this.openConsensus = openConsensus;
         this.openAwardConsensusNodeProvider = openAwardConsensusNodeProvider;
         this.authorizationCode = authorizationCode;
@@ -84,6 +85,14 @@ public class PocmCreateContractEvent implements Event {
 
     public void setMinimumStaking(BigInteger minimumStaking) {
         this.minimumStaking = minimumStaking;
+    }
+
+    public BigInteger getMaximumStaking() {
+        return maximumStaking;
+    }
+
+    public void setMaximumStaking(BigInteger maximumStaking) {
+        this.maximumStaking = maximumStaking;
     }
 
     public boolean isOpenConsensus() {
