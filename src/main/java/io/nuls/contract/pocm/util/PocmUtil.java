@@ -32,6 +32,9 @@ import java.math.BigInteger;
  */
 public class PocmUtil {
 
+    public final static int NORMAL_MODE = 0;
+    public final static int LP_MODE = 1;
+    public final static BigInteger TEN_THOUSAND = BigInteger.valueOf(10000);
     public final static BigInteger MININUM_TRANSFER_AMOUNT = BigInteger.TEN.pow(6);
 
     public final static BigInteger ONE_NULS = BigInteger.valueOf(100000000L);

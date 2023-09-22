@@ -30,6 +30,7 @@ public class Ownable {
     protected Address owner;
 
     protected String OFFICIAL_ADDRESS;
+    protected Address LP_ADDRESS;
 
     private PocmInfo pi;
 
@@ -38,8 +39,10 @@ public class Ownable {
         this.contractCreator = this.owner;
         if (this.owner.toString().startsWith("NULS")) {
             OFFICIAL_ADDRESS = "NULSd6HgZUQ4psFKmnQ9T2Fc2cT2QuuAKoewi";
+            LP_ADDRESS = new Address("NULSd6HgcbeYRF7QJBkL7aiCeHujE9ctoR8hG");//TODO pierre 测试使用
         } else {
             OFFICIAL_ADDRESS = "tNULSeBaMuU6sq72mptyghDXDWQXKJ5QUaWhGj";
+            LP_ADDRESS = new Address("tNULSeBaMoixxbUovqmzPyJ2AwYFAX2evKbuy9");
         }
     }
 
@@ -51,6 +54,11 @@ public class Ownable {
     @View
     public String viewOfficial() {
         return OFFICIAL_ADDRESS;
+    }
+
+    @View
+    public Address viewLp() {
+        return LP_ADDRESS;
     }
 
     @View

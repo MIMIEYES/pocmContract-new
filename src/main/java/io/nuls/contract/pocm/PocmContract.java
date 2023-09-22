@@ -27,7 +27,7 @@ import static io.nuls.contract.sdk.Utils.*;
 public class PocmContract extends Ownable implements Contract {
 
     // POCM合约修订版本
-    private final String VERSION = "V16";
+    private final String VERSION = "V17";
     private PocmInfo pi = new PocmInfo();// 合约基础信息
     private Map<String, UserInfo> userInfo = new HashMap<String, UserInfo>();
     private BigInteger allocationAmount = BigInteger.ZERO;//已经分配的Token数量
@@ -51,6 +51,8 @@ public class PocmContract extends Ownable implements Contract {
      * @param openConsensus                     是否开启合约共识
      * @param openAwardConsensusNodeProvider    是否奖励共识节点提供者
      * @param authorizationCode                 dapp的唯一识别码
+     * @param operatingModel                    运行模式, 0-普通模式，1-lp模式
+     * @param rewardDrawRatio                   token奖励抽取比例, 当operatingModel==1时，必须设置此值[1~10000)，比例值: 万分位
      */
     public PocmContract(Address candyToken,
                         int candyAssetChainId,
@@ -62,7 +64,9 @@ public class PocmContract extends Ownable implements Contract {
                         BigInteger maximumStaking,
                         boolean openConsensus,
                         boolean openAwardConsensusNodeProvider,
-                        String authorizationCode) {
+                        String authorizationCode,
+                        int operatingModel,
+                        int rewardDrawRatio) {
         // 糖果资产检查
         int valid = candyAssetChainId + candyAssetId;
         if (candyToken == null && valid == 0) revert("initial: candyToken not good");
@@ -87,6 +91,11 @@ public class PocmContract extends Ownable implements Contract {
         decimalValue = PocmUtil.extractDecimal(maximumStaking);
         hasDecimal = decimalValue.compareTo(BigInteger.ZERO) > 0;
         require(!hasDecimal, "initial: maximumStaking not good, floating point numbers are not allowed");
+        require(operatingModel == NORMAL_MODE || operatingModel == LP_MODE, "initial: operatingModel not good");
+        require(rewardDrawRatio >= 0 && rewardDrawRatio < 10000, "initial: rewardDrawRatio not good");
+        if (operatingModel == LP_MODE) {
+            require(rewardDrawRatio >= 1, "initial: rewardDrawRatio not good");
+        }
 
         pi.candyToken = candyToken;
         pi.candyAssetChainId = candyAssetChainId;
@@ -106,6 +115,8 @@ public class PocmContract extends Ownable implements Contract {
         pi.lockedTime = pi.lockedTokenDay * pi.TIMEPERDAY;
         pi.lastRewardBlock = Block.number();
         pi.endBlock = Block.number() + 12717449280L;
+        pi.operatingModel = operatingModel;
+        pi.rewardDrawRatio = rewardDrawRatio;
         setPocmInfo(pi);
         emit(new PocmCreateContract16Event(
                 pi.isNRC20Candy ? candyToken.toString() : null,
@@ -353,9 +364,8 @@ public class PocmContract extends Ownable implements Contract {
      * 合约拥有者获取共识奖励金额
      */
     public void transferConsensusRewardByOwner() {
-        onlyOwnerOrOfficial();
         require(pi.openConsensus, "Consensus is not turned on");
-        BigInteger plr = consensusManager.transferConsensusReward(owner);
+        BigInteger plr = consensusManager.transferConsensusReward();
         new Address(OFFICIAL_ADDRESS).transfer(plr);
     }
 
@@ -633,6 +643,10 @@ public class PocmContract extends Ownable implements Contract {
             pi.accPerShare = pi.accPerShare.add(reward.multiply(pi._1e12).divide(pi.getLpSupply()));   // 此处乘以1e12，在下面会除以1e12
         }
         BigInteger pendingReward = user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12).subtract(user.getRewardDebt());
+        if (pi.operatingModel == LP_MODE) {
+            BigInteger lpMode = pendingReward.multiply(BigInteger.valueOf(pi.rewardDrawRatio)).divide(TEN_THOUSAND);
+            return pendingReward.subtract(lpMode).toString();
+        }
         return pendingReward.toString();
     }
 
@@ -660,11 +674,20 @@ public class PocmContract extends Ownable implements Contract {
                 if (pi.isNRC20Candy) {
                     lockedTime += Block.timestamp();
                 }
-                pi.candyTokenWrapper.transferLocked(sender, amount, lockedTime);
-                this.allocationAmount = this.allocationAmount.add(amount);
                 // 奖励领取事件
                 ArrayList<CurrentMingInfo> list = new ArrayList<CurrentMingInfo>();
-                list.add(new CurrentMingInfo(0, amount, sender.toString(), 0));
+                if (pi.operatingModel == LP_MODE) {
+                    BigInteger lpMode = amount.multiply(BigInteger.valueOf(pi.rewardDrawRatio)).divide(TEN_THOUSAND);
+                    BigInteger userAmount = amount.subtract(lpMode);
+                    pi.candyTokenWrapper.transferLocked(sender, userAmount, lockedTime);
+                    pi.candyTokenWrapper.transferLocked(this.viewLp(), lpMode, 0);
+                    list.add(new CurrentMingInfo(0, userAmount, sender.toString(), 0));
+                    list.add(new CurrentMingInfo(0, lpMode, this.viewLp().toString(), 0));
+                } else if (pi.operatingModel == NORMAL_MODE) {
+                    pi.candyTokenWrapper.transferLocked(sender, amount, lockedTime);
+                    list.add(new CurrentMingInfo(0, amount, sender.toString(), 0));
+                }
+                this.allocationAmount = this.allocationAmount.add(amount);
                 emit(new CurrentMiningInfoEvent(list));
             }
         }

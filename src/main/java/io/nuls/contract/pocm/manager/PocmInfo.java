@@ -59,6 +59,8 @@ public class PocmInfo {
     public String authorizationCode;//dapp的唯一识别码
     public Long endBlock;// 池子结束高度
     public BigInteger c = BigInteger.TEN;
+    public int operatingModel;
+    public int rewardDrawRatio;
 
     public void addLpSupply(BigInteger lpSupply) {
         if (this.lpSupply.compareTo(BigInteger.ZERO) == 0 && lpSupply.compareTo(BigInteger.ZERO) > 0) {

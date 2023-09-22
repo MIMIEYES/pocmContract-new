@@ -29,6 +29,7 @@ import io.nuls.contract.pocm.manager.deposit.DepositOthersManager;
 import io.nuls.contract.pocm.model.ConsensusAgentDepositInfo;
 import io.nuls.contract.pocm.model.ConsensusAwardInfo;
 import io.nuls.contract.pocm.model.UserInfo;
+import io.nuls.contract.pocm.util.PocmUtil;
 import io.nuls.contract.sdk.Address;
 import io.nuls.contract.sdk.Msg;
 
@@ -36,6 +37,7 @@ import java.math.BigInteger;
 import java.util.Map;
 import java.util.Set;
 
+import static io.nuls.contract.pocm.util.PocmUtil.MININUM_TRANSFER_AMOUNT;
 import static io.nuls.contract.pocm.util.PocmUtil.toNuls;
 import static io.nuls.contract.sdk.Utils.emit;
 import static io.nuls.contract.sdk.Utils.require;
@@ -177,15 +179,21 @@ public class ConsensusManager {
     /**
      * 转移共识奖励金额
      */
-    public BigInteger transferConsensusReward(Address beneficiary) {
+    public BigInteger transferConsensusReward() {
         BigInteger availableAward = awardInfo.getAvailableAward();
         require(availableAward.compareTo(BigInteger.ZERO) > 0, "No consensus reward amount available");
         // 清零
         awardInfo.resetAvailableAward();
         BigInteger b = BigInteger.valueOf(100);
         BigInteger project = availableAward.multiply(b.subtract(pi.c)).divide(b);
-        beneficiary.transfer(project);
-        return availableAward.subtract(project);
+        BigInteger p = availableAward.subtract(project);
+        require(p.compareTo(MININUM_TRANSFER_AMOUNT) >= 0, "Reward too small");
+        if (pi.operatingModel == PocmUtil.NORMAL_MODE) {
+            pocmContract.viewOwner().transfer(project);
+        } else if (pi.operatingModel == PocmUtil.LP_MODE) {
+            pocmContract.viewLp().transfer(project);
+        }
+        return p;
     }
 
     /**
