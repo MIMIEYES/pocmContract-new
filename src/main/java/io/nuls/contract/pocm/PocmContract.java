@@ -52,7 +52,7 @@ public class PocmContract extends Ownable implements Contract {
      * @param openAwardConsensusNodeProvider    是否奖励共识节点提供者
      * @param authorizationCode                 dapp的唯一识别码
      * @param operatingModel                    运行模式, 0-普通模式，1-lp模式
-     * @param rewardDrawRatio                   token奖励抽取比例, 当operatingModel==1时，必须设置此值[1~10000)，比例值: 万分位
+     * @param rewardDrawRatioForLp              token奖励抽取比例, 当operatingModel==1时，必须设置此值[1~10000)，比例值: 万分位
      */
     public PocmContract(Address candyToken,
                         int candyAssetChainId,
@@ -66,7 +66,7 @@ public class PocmContract extends Ownable implements Contract {
                         boolean openAwardConsensusNodeProvider,
                         String authorizationCode,
                         int operatingModel,
-                        int rewardDrawRatio) {
+                        int rewardDrawRatioForLp) {
         // 糖果资产检查
         int valid = candyAssetChainId + candyAssetId;
         if (candyToken == null && valid == 0) revert("initial: candyToken not good");
@@ -92,9 +92,9 @@ public class PocmContract extends Ownable implements Contract {
         hasDecimal = decimalValue.compareTo(BigInteger.ZERO) > 0;
         require(!hasDecimal, "initial: maximumStaking not good, floating point numbers are not allowed");
         require(operatingModel == NORMAL_MODE || operatingModel == LP_MODE, "initial: operatingModel not good");
-        require(rewardDrawRatio >= 0 && rewardDrawRatio < 10000, "initial: rewardDrawRatio not good");
+        require(rewardDrawRatioForLp >= 0 && rewardDrawRatioForLp < 10000, "initial: rewardDrawRatio not good");
         if (operatingModel == LP_MODE) {
-            require(rewardDrawRatio >= 1, "initial: rewardDrawRatio not good");
+            require(rewardDrawRatioForLp >= 1, "initial: rewardDrawRatio not good");
         }
 
         pi.candyToken = candyToken;
@@ -116,16 +116,16 @@ public class PocmContract extends Ownable implements Contract {
         pi.lastRewardBlock = Block.number();
         pi.endBlock = Block.number() + 12717449280L;
         pi.operatingModel = operatingModel;
-        pi.rewardDrawRatio = rewardDrawRatio;
+        pi.rewardDrawRatioForLp = rewardDrawRatioForLp;
         setPocmInfo(pi);
-        emit(new PocmCreateContract16Event(
+        emit(new PocmCreateContract17Event(
                 pi.isNRC20Candy ? candyToken.toString() : null,
                 candyAssetChainId, candyAssetId,
                 candyPerBlock, candySupply,
                 lockedTokenDay,
                 minimumStaking,
                 maximumStaking,
-                openConsensus, openAwardConsensusNodeProvider, authorizationCode));
+                openConsensus, openAwardConsensusNodeProvider, authorizationCode, operatingModel, rewardDrawRatioForLp));
     }
 
     @Override
@@ -644,7 +644,7 @@ public class PocmContract extends Ownable implements Contract {
         }
         BigInteger pendingReward = user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12).subtract(user.getRewardDebt());
         if (pi.operatingModel == LP_MODE) {
-            BigInteger lpMode = pendingReward.multiply(BigInteger.valueOf(pi.rewardDrawRatio)).divide(TEN_THOUSAND);
+            BigInteger lpMode = pendingReward.multiply(BigInteger.valueOf(pi.rewardDrawRatioForLp)).divide(TEN_THOUSAND);
             return pendingReward.subtract(lpMode).toString();
         }
         return pendingReward.toString();
@@ -677,7 +677,7 @@ public class PocmContract extends Ownable implements Contract {
                 // 奖励领取事件
                 ArrayList<CurrentMingInfo> list = new ArrayList<CurrentMingInfo>();
                 if (pi.operatingModel == LP_MODE) {
-                    BigInteger lpMode = amount.multiply(BigInteger.valueOf(pi.rewardDrawRatio)).divide(TEN_THOUSAND);
+                    BigInteger lpMode = amount.multiply(BigInteger.valueOf(pi.rewardDrawRatioForLp)).divide(TEN_THOUSAND);
                     BigInteger userAmount = amount.subtract(lpMode);
                     pi.candyTokenWrapper.transferLocked(sender, userAmount, lockedTime);
                     pi.candyTokenWrapper.transferLocked(this.viewLp(), lpMode, 0);

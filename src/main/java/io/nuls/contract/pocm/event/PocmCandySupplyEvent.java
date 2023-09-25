@@ -42,11 +42,4 @@ public class PocmCandySupplyEvent implements Event {
         this.supply = supply;
     }
 
-    public BigInteger getSupply() {
-        return supply;
-    }
-
-    public void setSupply(BigInteger supply) {
-        this.supply = supply;
-    }
 }

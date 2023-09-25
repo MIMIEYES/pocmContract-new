@@ -13,13 +13,6 @@ public class CurrentMiningInfoEvent implements Event {
         this.mingInfosList=list;
     }
 
-    public List<CurrentMingInfo> getMingInfosList() {
-        return mingInfosList;
-    }
-
-    public void setMingInfosList(List<CurrentMingInfo> mingInfosList) {
-        this.mingInfosList = mingInfosList;
-    }
 }
 
 

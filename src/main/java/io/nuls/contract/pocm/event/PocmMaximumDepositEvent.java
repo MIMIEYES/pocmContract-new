@@ -42,11 +42,4 @@ public class PocmMaximumDepositEvent implements Event {
         this.maximumDeposit = maximumDeposit;
     }
 
-    public BigInteger getMaximumDeposit() {
-        return maximumDeposit;
-    }
-
-    public void setMaximumDeposit(BigInteger maximumDeposit) {
-        this.maximumDeposit = maximumDeposit;
-    }
 }

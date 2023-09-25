@@ -60,7 +60,7 @@ public class PocmInfo {
     public Long endBlock;// 池子结束高度
     public BigInteger c = BigInteger.TEN;
     public int operatingModel;
-    public int rewardDrawRatio;
+    public int rewardDrawRatioForLp;
 
     public void addLpSupply(BigInteger lpSupply) {
         if (this.lpSupply.compareTo(BigInteger.ZERO) == 0 && lpSupply.compareTo(BigInteger.ZERO) > 0) {

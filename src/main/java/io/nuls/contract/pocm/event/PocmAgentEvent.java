@@ -46,27 +46,4 @@ public class PocmAgentEvent implements Event {
         this.openNodeAward = openNodeAward;
     }
 
-    public String getHash() {
-        return hash;
-    }
-
-    public void setHash(String hash) {
-        this.hash = hash;
-    }
-
-    public BigInteger getValue() {
-        return value;
-    }
-
-    public void setValue(BigInteger value) {
-        this.value = value;
-    }
-
-    public boolean isOpenNodeAward() {
-        return openNodeAward;
-    }
-
-    public void setOpenNodeAward(boolean openNodeAward) {
-        this.openNodeAward = openNodeAward;
-    }
 }
