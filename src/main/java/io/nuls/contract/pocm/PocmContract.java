@@ -680,7 +680,13 @@ public class PocmContract extends Ownable implements Contract {
                     BigInteger lpMode = amount.multiply(BigInteger.valueOf(pi.rewardDrawRatioForLp)).divide(TEN_THOUSAND);
                     BigInteger userAmount = amount.subtract(lpMode);
                     pi.candyTokenWrapper.transferLocked(sender, userAmount, lockedTime);
-                    pi.candyTokenWrapper.transferLocked(this.viewLp(), lpMode, 0);
+                    if (pi.isNRC20Candy) {
+                        pi.candyTokenWrapper.approve(this.viewLp(), lpMode);
+                        this.viewLp().call("amountEnter", null, new String[][]{new String[]{lpMode.toString()}, new String[]{pi.candyToken.toString()}}, BigInteger.ZERO);
+                    } else {
+                        this.viewLp().callWithReturnValue("amountEnter", null, new String[][]{new String[]{"0"}, new String[]{}}, BigInteger.ZERO,
+                                new MultyAssetValue[]{new MultyAssetValue(lpMode, pi.candyAssetChainId, pi.candyAssetId)});
+                    }
                     list.add(new CurrentMingInfo(0, userAmount, sender.toString(), 0));
                     list.add(new CurrentMingInfo(0, lpMode, this.viewLp().toString(), 0));
                 } else if (pi.operatingModel == NORMAL_MODE) {

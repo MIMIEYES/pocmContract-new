@@ -32,6 +32,7 @@ import io.nuls.contract.pocm.model.UserInfo;
 import io.nuls.contract.pocm.util.PocmUtil;
 import io.nuls.contract.sdk.Address;
 import io.nuls.contract.sdk.Msg;
+import io.nuls.contract.sdk.Utils;
 
 import java.math.BigInteger;
 import java.util.Map;
@@ -191,7 +192,8 @@ public class ConsensusManager {
         if (pi.operatingModel == PocmUtil.NORMAL_MODE) {
             pocmContract.viewOwner().transfer(project);
         } else if (pi.operatingModel == PocmUtil.LP_MODE) {
-            pocmContract.viewLp().transfer(project);
+            //pocmContract.viewLp().transfer(project);
+            pocmContract.viewLp().call("amountEnter", null, new String[][]{new String[]{"0"}, new String[]{}}, project);
         }
         return p;
     }
