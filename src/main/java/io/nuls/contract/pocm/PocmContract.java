@@ -455,6 +455,20 @@ public class PocmContract extends Ownable implements Contract {
         }
     }
 
+    public void receiveAll() {
+        Set<String> userSet = this.userInfo.keySet();
+        List<String> userList = new ArrayList<String>(userSet);
+        for (String user : userList) {
+            this.receiveAwardsByAddress(new Address(user));
+        }
+    }
+
+    public void receiveByAddresses(String[] addresses) {
+        for (String user : addresses) {
+            this.receiveAwardsByAddress(new Address(user));
+        }
+    }
+
     public void giveUpAll() {
         onlyOfficial();
         require(consensusManager.getAgents() == null, "Please remove the consensus node first");
