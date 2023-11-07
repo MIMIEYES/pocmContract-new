@@ -39,10 +39,10 @@ public class Ownable {
         this.contractCreator = this.owner;
         if (this.owner.toString().startsWith("NULS")) {
             OFFICIAL_ADDRESS = "NULSd6HgZUQ4psFKmnQ9T2Fc2cT2QuuAKoewi";
-            LP_ADDRESS = new Address("NULSd6HgZUQ4psFKmnQ9T2Fc2cT2QuuAKoewi");
+            LP_ADDRESS = new Address("NULSd6HgtaXPXjkvegxYZHpzwwmieEgx7kUCc");
         } else {
             OFFICIAL_ADDRESS = "tNULSeBaMuU6sq72mptyghDXDWQXKJ5QUaWhGj";
-            LP_ADDRESS = new Address("tNULSeBaN8WiBAA5pi8QjVi2MJboMERhTHtPi1");
+            LP_ADDRESS = new Address("tNULSeBaNA4tPMPCFaBLV1cfZUzNTWn934Qx73");
         }
     }
 
