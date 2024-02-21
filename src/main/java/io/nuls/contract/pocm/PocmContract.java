@@ -27,7 +27,7 @@ import static io.nuls.contract.sdk.Utils.*;
 public class PocmContract extends Ownable implements Contract {
 
     // POCM合约修订版本
-    private final String VERSION = "V17";
+    private final String VERSION = "V18";
     private PocmInfo pi = new PocmInfo();// 合约基础信息
     private Map<String, UserInfo> userInfo = new HashMap<String, UserInfo>();
     private BigInteger allocationAmount = BigInteger.ZERO;//已经分配的Token数量
@@ -71,6 +71,7 @@ public class PocmContract extends Ownable implements Contract {
         int valid = candyAssetChainId + candyAssetId;
         if (candyToken == null && valid == 0) revert("initial: candyToken not good");
         require(candyToken == null || valid == 0, "initial: candyToken not good");
+        if(candyAssetChainId == 1 && candyAssetId == 1) revert("initial: candyToken not good");
         if (candyToken != null) {
             require(candyToken.isContract(), "initial: candyToken not good");
             pi.isNRC20Candy = true;
@@ -177,7 +178,6 @@ public class PocmContract extends Ownable implements Contract {
     public void depositForOwn() {
         require(isAllocationToken(), "No enough candy token in the contract");
         require(isAcceptStaking(), "Cannot staking, please check the contract");
-        require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
         Address sender = Msg.sender();
         String senderAddress = sender.toString();
         UserInfo user = this.userInfo.get(senderAddress);
@@ -664,10 +664,14 @@ public class PocmContract extends Ownable implements Contract {
         return pendingReward.toString();
     }
 
-    private void receiveInternal(Address sender, UserInfo user) {
+    private BigInteger checkCandyBalance() {
         BigInteger candyBalance = pi.candyTokenWrapper.balanceOf(Msg.address());
         require(candyBalance.compareTo(BigInteger.ZERO) > 0, "No enough candy token in the contract");
-        require(unreachedLimitCandySupply(), "No enough candy supply in the contract");
+        return candyBalance;
+    }
+
+    private void receiveInternal(Address sender, UserInfo user) {
+        BigInteger candyBalance = checkCandyBalance();
         if (user.getAvailableAmount().compareTo(BigInteger.ZERO) > 0) {
             BigInteger pending = user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12).subtract(user.getRewardDebt());
             if (pending.compareTo(BigInteger.ZERO) > 0) {
@@ -678,11 +682,6 @@ public class PocmContract extends Ownable implements Contract {
                 } else {
                     amount = candyBalance;
                     this.isAcceptStaking = false;
-                }
-                // 发放的奖励 + 已发放的奖励 <= 糖果发行量
-                BigInteger limitCandy = pi.candySupply.subtract(this.allocationAmount);
-                if (limitCandy.compareTo(amount) <= 0) {
-                    amount = limitCandy;
                 }
                 long lockedTime = pi.lockedTime;
                 if (pi.isNRC20Candy) {
@@ -715,6 +714,7 @@ public class PocmContract extends Ownable implements Contract {
 
     private void withdrawByUser(Address sender, UserInfo user, BigInteger _amount) {
         String senderAddress = sender.toString();
+        require(_amount.compareTo(BigInteger.ZERO) > 0, "withdraw: amount not good");
         require(user.getAmount().compareTo(_amount) >= 0, "withdraw: amount not good");
         updatePool();
         // 领取奖励
@@ -765,14 +765,10 @@ public class PocmContract extends Ownable implements Contract {
         return isAcceptStaking;
     }
 
-    private boolean unreachedLimitCandySupply() {
-        return pi.candySupply.compareTo(this.allocationAmount) > 0;
-    }
-
     private boolean isAllocationToken() {
         if (!isAllocationToken) {
             BigInteger balance = pi.candyTokenWrapper.balanceOf(Msg.address());
-            if (balance.compareTo(pi.candySupply) >= 0) {
+            if (balance.compareTo(BigInteger.ZERO) > 0) {
                 isAllocationToken = true;
                 isAcceptStaking = true;
             }

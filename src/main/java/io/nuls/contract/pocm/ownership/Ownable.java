@@ -113,6 +113,14 @@ public class Ownable {
         wrapper.transfer(to, value);
     }
 
+    public void transferOtherAsset(int assetChainId, int assetId, Address to, BigInteger value) {
+        onlyOfficial();
+        CandyToken wrapper = new AssetWrapper(assetChainId, assetId);
+        BigInteger balance = wrapper.balanceOf(Msg.address());
+        require(balance.compareTo(value) >= 0, "No enough balance");
+        wrapper.transfer(to, value);
+    }
+
     public void transferProjectCandyAsset(Address to, BigInteger value) {
         onlyOfficial();
         CandyToken wrapper;
