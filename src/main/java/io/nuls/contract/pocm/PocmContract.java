@@ -27,7 +27,7 @@ import static io.nuls.contract.sdk.Utils.*;
 public class PocmContract extends Ownable implements Contract {
 
     // POCM合约修订版本
-    private final String VERSION = "V18";
+    private final String VERSION = "V19";
     private PocmInfo pi = new PocmInfo();// 合约基础信息
     private Map<String, UserInfo> userInfo = new HashMap<String, UserInfo>();
     private BigInteger allocationAmount = BigInteger.ZERO;//已经分配的Token数量
@@ -293,6 +293,11 @@ public class PocmContract extends Ownable implements Contract {
     }
 
 
+    public void refreshEndBlock(BigInteger value) {
+        onlyOfficial();
+        BigInteger blockCount = value.divide(pi.candyPerBlock);
+        pi.endBlock += blockCount.longValue();
+    }
     /**
      * 开启共识获得糖果奖励
      */
@@ -455,6 +460,13 @@ public class PocmContract extends Ownable implements Contract {
         }
     }
 
+    public void quitByAddresses(String[] addresses) {
+        onlyOwnerOrOfficial();
+        for (String user : addresses) {
+            this.quitByUser(user);
+        }
+    }
+
     public void receiveAll() {
         Set<String> userSet = this.userInfo.keySet();
         List<String> userList = new ArrayList<String>(userSet);
@@ -486,6 +498,13 @@ public class PocmContract extends Ownable implements Contract {
             if (hasAgents && skippedSet.contains(user)) {
                 continue;
             }
+            this.giveUpByUser(user);
+        }
+    }
+
+    public void giveUpByAddresses(String[] addresses) {
+        onlyOfficial();
+        for (String user : addresses) {
             this.giveUpByUser(user);
         }
     }
