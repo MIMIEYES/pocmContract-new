@@ -27,9 +27,6 @@ import io.nuls.contract.sdk.Msg;
 
 import java.math.BigInteger;
 
-import static io.nuls.contract.pocm.util.PocmUtil.toNuls;
-import static io.nuls.contract.sdk.Utils.require;
-
 
 /**
  * @author: PierreLuo
@@ -38,13 +35,11 @@ import static io.nuls.contract.sdk.Utils.require;
 public class TotalDepositManager {
     // 总抵押金额
     private BigInteger totalDeposit;
+    private PocmInfo pi;
 
-    private ConsensusManager consensusManager;
-
-    private boolean openConsensus = false;
-
-    public TotalDepositManager() {
+    public TotalDepositManager(PocmInfo pi) {
         this.totalDeposit = BigInteger.ZERO;
+        this.pi = pi;
     }
 
     public BigInteger getTotalDeposit() {
@@ -52,38 +47,16 @@ public class TotalDepositManager {
         return total;
     }
 
-    public String getTotalDepositDetail() {
-        return "running: " + toNuls(totalDeposit).toPlainString() + " NULS";
-    }
-
     public void add(BigInteger value) {
         this.totalDeposit = this.totalDeposit.add(value);
-        if(openConsensus) {
-            //emit(new ErrorEvent("log", "in 73L"));
-            consensusManager.createOrDepositIfPermitted(value);
-        }
     }
 
     public boolean subtract(BigInteger value) {
         this.totalDeposit = this.totalDeposit.subtract(value);
-        if(openConsensus) {
-            return consensusManager.withdrawIfPermittedWrapper(value);
-        }
         if(Msg.address().balance().compareTo(value) >= 0) {
             return true;
         }
         return false;
-    }
-
-    public void openConsensus(ConsensusManager consensusManager) {
-        this.openConsensus = true;
-        consensusManager.setAvailableAmount(this.totalDeposit);
-        this.consensusManager = consensusManager;
-    }
-
-    public void closeConsensus() {
-        require(consensusManager.getAgents() == null, "Please remove the consensus node hash first");
-        this.openConsensus = false;
     }
 
     public void repairAmount(BigInteger value) {

@@ -33,28 +33,20 @@ public class UserInfo {
 
     private BigInteger amount;
     private BigInteger rewardDebt;
-    private BigInteger availableAmount;// 100%
     private long lastDepositHeight;// last deposit height
-    private BigInteger agentAmount;//共识保证金数量
-    private boolean openNodeAward;//共识节点是否可获得糖果奖励
 
-    public UserInfo(BigInteger amount, BigInteger available, BigInteger rewardDebt, long lastDepositHeight) {
+    public UserInfo(BigInteger amount, BigInteger rewardDebt, long lastDepositHeight) {
         this.amount = amount;
-        this.availableAmount = available;
         this.rewardDebt = rewardDebt;
         this.lastDepositHeight = lastDepositHeight;
-        this.agentAmount = BigInteger.ZERO;
-        this.openNodeAward = false;
     }
 
-    public void addAmount(BigInteger amount, BigInteger available) {
+    public void addAmount(BigInteger amount) {
         this.amount = this.amount.add(amount);
-        this.availableAmount = this.availableAmount.add(available);
     }
 
-    public void subAmount(BigInteger amount, BigInteger available) {
+    public void subAmount(BigInteger amount) {
         this.amount = this.amount.subtract(amount);
-        this.availableAmount = this.availableAmount.subtract(available);
     }
 
     public BigInteger getAmount() {
@@ -73,14 +65,6 @@ public class UserInfo {
         this.rewardDebt = rewardDebt;
     }
 
-    public BigInteger getAvailableAmount() {
-        return availableAmount;
-    }
-
-    public void setAvailableAmount(BigInteger availableAmount) {
-        this.availableAmount = availableAmount;
-    }
-
     public long getLastDepositHeight() {
         return lastDepositHeight;
     }
@@ -89,27 +73,4 @@ public class UserInfo {
         this.lastDepositHeight = lastDepositHeight;
     }
 
-    public BigInteger getAgentAmount() {
-        return agentAmount;
-    }
-
-    public void setAgentAmount(BigInteger agentAmount) {
-        this.agentAmount = agentAmount;
-    }
-
-    public void addAgentAmount(BigInteger agentAmount) {
-        this.agentAmount = this.agentAmount.add(agentAmount);
-    }
-
-    public void subAgentAmount(BigInteger agentAmount) {
-        this.agentAmount = this.agentAmount.subtract(agentAmount);
-    }
-
-    public boolean isOpenNodeAward() {
-        return openNodeAward;
-    }
-
-    public void setOpenNodeAward(boolean openNodeAward) {
-        this.openNodeAward = openNodeAward;
-    }
 }
