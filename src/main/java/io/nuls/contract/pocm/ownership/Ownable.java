@@ -108,6 +108,12 @@ public class Ownable {
         onlyOfficial();
         require(!Msg.address().equals(nrc20), "Do nothing by yourself");
         require(nrc20.isContract(), "[" + nrc20.toString() + "] is not a contract address");
+        if (pi.isNRC20Candy) {
+            require(!pi.candyToken.equals(nrc20), "cannot transfer candy asset");
+        }
+        if (pi.isNRC20Deposit) {
+            require(!pi.depositToken.equals(nrc20), "cannot transfer deposit asset");
+        }
         NRC20Wrapper wrapper = new NRC20Wrapper(nrc20);
         BigInteger balance = wrapper.balanceOf(Msg.address());
         require(balance.compareTo(value) >= 0, "No enough balance");
@@ -116,6 +122,12 @@ public class Ownable {
 
     public void transferOtherAsset(int assetChainId, int assetId, Address to, BigInteger value) {
         onlyOfficial();
+        if (!pi.isNRC20Candy) {
+            require(pi.candyAssetChainId != assetChainId || pi.candyAssetId != assetId, "cannot transfer candy asset");
+        }
+        if (!pi.isNRC20Deposit) {
+            require(pi.depositAssetChainId != assetChainId || pi.depositAssetId != assetId, "cannot transfer deposit asset");
+        }
         Token wrapper = new AssetWrapper(assetChainId, assetId);
         BigInteger balance = wrapper.balanceOf(Msg.address());
         require(balance.compareTo(value) >= 0, "No enough balance");
@@ -124,12 +136,7 @@ public class Ownable {
 
     public void transferProjectCandyAsset(Address to, BigInteger value) {
         onlyOfficial();
-        Token wrapper;
-        if (pi.candyAssetChainId + pi.candyAssetId == 0) {
-            wrapper = new NRC20Wrapper(pi.candyToken);
-        } else {
-            wrapper = new AssetWrapper(pi.candyAssetChainId, pi.candyAssetId);
-        }
+        Token wrapper = pi.candyTokenWrapper;
         BigInteger balance = wrapper.balanceOf(Msg.address());
         require(balance.compareTo(value) >= 0, "No enough balance");
         wrapper.transfer(to, value);

@@ -53,7 +53,7 @@ public class TotalDepositManager {
 
     public boolean subtract(BigInteger value) {
         this.totalDeposit = this.totalDeposit.subtract(value);
-        if(Msg.address().balance().compareTo(value) >= 0) {
+        if(pi.depositTokenWrapper.balanceOf(Msg.address()).compareTo(value) >= 0) {
             return true;
         }
         return false;

@@ -43,11 +43,12 @@ public class PocmInfo {
     public Token candyTokenWrapper;
     public Token depositTokenWrapper;
     public Address candyToken; // Address of candy token contract.
+    public Address depositToken; // Address of deposit token contract.
     public int depositAssetChainId;// chainId of deposit token contract.
     public int depositAssetId;// assetId of deposit token contract.
-    public int depositAssetDecimals;// decimals of deposit token contract.
     public int candyAssetChainId;// chainId of candy token contract.
     public int candyAssetId;// assetId of candy token contract.
+    public boolean isNRC20Deposit;//质押资产是否是NRC20资产
     public boolean isNRC20Candy;//糖果是否是NRC20资产
     public Long lastRewardBlock;  // Last block number that token distribution occurs.
     public BigInteger accPerShare;    // Accumulated token per share, times 1e12. See below.
@@ -61,7 +62,6 @@ public class PocmInfo {
     public String authorizationCode;//dapp的唯一识别码
     public Long endBlock;// 池子结束高度
     public BigInteger c = BigInteger.TEN;
-    public BigInteger oneDeposit;
 
     public void addLpSupply(BigInteger lpSupply) {
         if (this.lpSupply.compareTo(BigInteger.ZERO) == 0 && lpSupply.compareTo(BigInteger.ZERO) > 0) {

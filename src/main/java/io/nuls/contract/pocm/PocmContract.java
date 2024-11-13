@@ -38,8 +38,9 @@ public class PocmContract extends Ownable implements Contract {
     /**
      * 注意: 如果糖果是NRC20资产，那么 candyAssetChainId 和 candyAssetId 要设置为0
      *
-     * @param depositAssetChainId               质押资产链ID
-     * @param depositAssetId                    质押资产ID
+     * @param depositToken                      质押资产（NRC20资产，和`depositAssetChainId`,`depositAssetId`不能同时存在）
+     * @param depositAssetChainId               质押资产链ID（非NRC20资产，和`depositToken`不能同时存在）
+     * @param depositAssetId                    质押资产ID（非NRC20资产，和`depositToken`不能同时存在）
      * @param candyToken                        糖果token地址（NRC20资产，和`candyAssetChainId`,`candyAssetId`不能同时存在）
      * @param candyAssetChainId                 糖果资产链ID（非NRC20资产，和`candyToken`不能同时存在）
      * @param candyAssetId                      糖果资产ID（非NRC20资产，和`candyToken`不能同时存在）
@@ -51,6 +52,7 @@ public class PocmContract extends Ownable implements Contract {
      * @param authorizationCode                 dapp的唯一识别码
      */
     public PocmContract(
+                        Address depositToken,
                         int depositAssetChainId,
                         int depositAssetId,
                         Address candyToken,
@@ -62,9 +64,22 @@ public class PocmContract extends Ownable implements Contract {
                         BigInteger minimumStaking,
                         BigInteger maximumStaking,
                         String authorizationCode) {
+        // 质押资产检查
+        int valid = depositAssetChainId + depositAssetId;
+        if (depositToken == null && valid == 0) revert("initial: depositToken not good");
+        require(depositToken == null || valid == 0, "initial: depositToken not good");
         if(depositAssetChainId == 1 && depositAssetId == 1) revert("initial: depositToken not good");
+        if (depositToken != null) {
+            require(depositToken.isContract(), "initial: depositToken not good");
+            pi.isNRC20Deposit = true;
+            pi.depositTokenWrapper = new NRC20Wrapper(depositToken);
+        } else {
+            pi.isNRC20Deposit = false;
+            pi.depositTokenWrapper = new AssetWrapper(depositAssetChainId, depositAssetId);
+        }
+
         // 糖果资产检查
-        int valid = candyAssetChainId + candyAssetId;
+        valid = candyAssetChainId + candyAssetId;
         if (candyToken == null && valid == 0) revert("initial: candyToken not good");
         require(candyToken == null || valid == 0, "initial: candyToken not good");
         if(candyAssetChainId == 1 && candyAssetId == 1) revert("initial: candyToken not good");
@@ -76,15 +91,14 @@ public class PocmContract extends Ownable implements Contract {
             pi.isNRC20Candy = false;
             pi.candyTokenWrapper = new AssetWrapper(candyAssetChainId, candyAssetId);
         }
-        pi.depositAssetDecimals = Utils.assetDecimals(depositAssetChainId, depositAssetId);
-        pi.oneDeposit = BigInteger.TEN.pow(pi.depositAssetDecimals);
         require(candyPerBlock.compareTo(BigInteger.ZERO) > 0, "initial: candyPerBlock not good");
         require(candySupply.compareTo(BigInteger.ZERO) > 0, "initial: candySupply not good");
         require(lockedTokenDay >= 0, "initial: lockedTokenDay not good");
         require(minimumStaking.compareTo(BigInteger.ZERO) > 0, "initial: minimumStaking not good");
         require(maximumStaking.compareTo(minimumStaking) >= 0, "initial: maximumStaking not good");
 
-        pi.depositTokenWrapper = new AssetWrapper(depositAssetChainId, depositAssetId);
+
+        pi.depositToken = depositToken;
         pi.depositAssetChainId = depositAssetChainId;
         pi.depositAssetId = depositAssetId;
         pi.candyToken = candyToken;
@@ -103,15 +117,16 @@ public class PocmContract extends Ownable implements Contract {
         pi.lastRewardBlock = Block.number();
         pi.endBlock = Block.number() + 12717449280L;
         setPocmInfo(pi);
-        //TODO pierre 创建合约事件
-        //emit(new PocmCreateContract19Event(
-        //        pi.isNRC20Candy ? candyToken.toString() : null,
-        //        candyAssetChainId, candyAssetId,
-        //        candyPerBlock, candySupply,
-        //        lockedTokenDay,
-        //        minimumStaking,
-        //        maximumStaking,
-        //        authorizationCode));
+        emit(new PocmCreateContractNewDepositEvent(
+                depositToken != null ? depositToken.toString() : null,
+                depositAssetChainId, depositAssetId,
+                pi.isNRC20Candy ? candyToken.toString() : null,
+                candyAssetChainId, candyAssetId,
+                candyPerBlock, candySupply,
+                lockedTokenDay,
+                minimumStaking,
+                maximumStaking,
+                authorizationCode));
     }
 
     @Override
@@ -153,33 +168,47 @@ public class PocmContract extends Ownable implements Contract {
 
     @PayableMultyAsset
     public void depositForOwn() {
+        require(!pi.isNRC20Deposit, "deposit: asset type not good, call depositNRC20 instead");
         require(isAllocationToken(), "No enough candy token in the contract");
         require(isAcceptStaking(), "Cannot staking, please check the contract");
         Address sender = Msg.sender();
-        String senderAddress = sender.toString();
-        UserInfo user = this.userInfo.get(senderAddress);
         BigInteger _amount = this.checkDepositAmount();
-        // 退还抵押金的小数位
+        this._deposit(sender, _amount);
+    }
+
+    public void depositNRC20(BigInteger _amount) {
+        require(pi.isNRC20Deposit, "deposit: asset type not good, call depositForOwn instead");
+        require(isAllocationToken(), "No enough candy token in the contract");
+        require(isAcceptStaking(), "Cannot staking, please check the contract");
+        Address sender = Msg.sender();
+        pi.depositTokenWrapper.transferFrom(sender, Msg.address(), _amount);
+        this._deposit(sender, _amount);
+    }
+
+    private void _deposit(Address staker, BigInteger _amount) {
+
+        String senderAddress = staker.toString();
+        UserInfo userInfo = this.userInfo.get(senderAddress);
         require(_amount.compareTo(pi.minimumStaking) >= 0, "amount not good[minimum]");
         require(_amount.compareTo(pi.maximumStaking) <= 0, "amount not good[maximum]");
         updatePool();
-        if (user != null) {
+        if (userInfo != null) {
             // 领取奖励
-            this.receiveInternal(sender, user);
+            this.receiveInternal(staker, userInfo);
         }
 
         long blockNumber = Block.number();
 
-        if (user == null) {
-            user = new UserInfo(_amount, BigInteger.ZERO, blockNumber);
-            this.userInfo.put(senderAddress, user);
+        if (userInfo == null) {
+            userInfo = new UserInfo(_amount, BigInteger.ZERO, blockNumber);
+            this.userInfo.put(senderAddress, userInfo);
         } else {
-            user.addAmount(_amount);
-            user.setLastDepositHeight(blockNumber);
+            userInfo.addAmount(_amount);
+            userInfo.setLastDepositHeight(blockNumber);
         }
-        require(user.getAmount().compareTo(pi.maximumStaking) <= 0, "user amount not good[maximum]");
+        require(userInfo.getAmount().compareTo(pi.maximumStaking) <= 0, "user amount not good[maximum]");
         pi.addLpSupply(_amount);
-        user.setRewardDebt(user.getAmount().multiply(pi.accPerShare).divide(pi._1e12));
+        userInfo.setRewardDebt(userInfo.getAmount().multiply(pi.accPerShare).divide(pi._1e12));
 
         totalDepositManager.add(_amount);
 
@@ -313,7 +342,7 @@ public class PocmContract extends Ownable implements Contract {
 
     @View
     public String totalDeposit() {
-        return toNuls(totalDepositManager.getTotalDeposit(), pi.depositAssetDecimals).toPlainString();
+        return totalDepositManager.getTotalDeposit().toString();
     }
 
     @View
