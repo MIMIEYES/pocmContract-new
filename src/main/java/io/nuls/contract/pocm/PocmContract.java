@@ -27,7 +27,7 @@ import static io.nuls.contract.sdk.Utils.*;
 public class PocmContract extends Ownable implements Contract {
 
     // POCM合约修订版本
-    private final String VERSION = "V19";
+    private final String VERSION = "N1";
     private PocmInfo pi = new PocmInfo();// 合约基础信息
     private Map<String, UserInfo> userInfo = new HashMap<String, UserInfo>();
     private BigInteger allocationAmount = BigInteger.ZERO;//已经分配的Token数量
