@@ -178,6 +178,7 @@ public class PocmContract extends Ownable implements Contract {
     public void depositForOwn() {
         require(isAllocationToken(), "No enough candy token in the contract");
         require(isAcceptStaking(), "Cannot staking, please check the contract");
+        require(!isEnd(), "Cannot staking, pool has ended");
         Address sender = Msg.sender();
         String senderAddress = sender.toString();
         UserInfo user = this.userInfo.get(senderAddress);
@@ -383,6 +384,7 @@ public class PocmContract extends Ownable implements Contract {
         onlyOwnerOrOfficial();
         require(pi.openConsensus, "Consensus is not turned on");
         require(isAllocationToken() && isAcceptStaking(), "No enough candy token in the contract");
+        require(!isEnd(), "Pool has ended");
         String[] agentInfo = consensusManager.addOtherAgent(agentHash);
         String agentAddress = agentInfo[0];
         Collection<ConsensusAgentDepositInfo> agentDepositInfos = agentDeposits.values();
@@ -778,6 +780,10 @@ public class PocmContract extends Ownable implements Contract {
             user.setRewardDebt(user.getAvailableAmount().multiply(pi.accPerShare).divide(pi._1e12));
         }
         pi.subLpSupply(available);
+    }
+
+    private boolean isEnd() {
+        return Block.number() >= pi.endBlock;
     }
 
     private boolean isAcceptStaking() {
