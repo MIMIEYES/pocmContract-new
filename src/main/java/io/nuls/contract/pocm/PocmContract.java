@@ -171,6 +171,7 @@ public class PocmContract extends Ownable implements Contract {
         require(!pi.isNRC20Deposit, "deposit: asset type not good, call depositNRC20 instead");
         require(isAllocationToken(), "No enough candy token in the contract");
         require(isAcceptStaking(), "Cannot staking, please check the contract");
+        require(!isEnd(), "Cannot staking, pool has ended");
         Address sender = Msg.sender();
         BigInteger _amount = this.checkDepositAmount();
         this._deposit(sender, _amount);
@@ -180,6 +181,7 @@ public class PocmContract extends Ownable implements Contract {
         require(pi.isNRC20Deposit, "deposit: asset type not good, call depositForOwn instead");
         require(isAllocationToken(), "No enough candy token in the contract");
         require(isAcceptStaking(), "Cannot staking, please check the contract");
+        require(!isEnd(), "Cannot staking, pool has ended");
         Address sender = Msg.sender();
         pi.depositTokenWrapper.transferFrom(sender, Msg.address(), _amount);
         this._deposit(sender, _amount);
@@ -510,6 +512,10 @@ public class PocmContract extends Ownable implements Contract {
             user.setRewardDebt(user.getAmount().multiply(pi.accPerShare).divide(pi._1e12));
         }
         pi.subLpSupply(_amount);
+    }
+
+    private boolean isEnd() {
+        return Block.number() >= pi.endBlock;
     }
 
     private boolean isAcceptStaking() {
