@@ -442,12 +442,16 @@ public class PocmContract extends Ownable implements Contract {
 
     private BigInteger checkCandyBalance() {
         BigInteger candyBalance = pi.candyTokenWrapper.balanceOf(Msg.address());
-        require(candyBalance.compareTo(BigInteger.ZERO) > 0, "No enough candy token in the contract");
+        require(candyBalance.compareTo(BigInteger.ZERO) >= 0, "No enough candy token in the contract");
         return candyBalance;
     }
 
     private void receiveInternal(Address sender, UserInfo user) {
         BigInteger candyBalance = checkCandyBalance();
+        if (candyBalance.compareTo(BigInteger.ZERO) == 0) {
+            this.isAcceptStaking = false;
+            return;
+        }
         if (user.getAmount().compareTo(BigInteger.ZERO) > 0) {
             BigInteger pending = user.getAmount().multiply(pi.accPerShare).divide(pi._1e12).subtract(user.getRewardDebt());
             if (pending.compareTo(BigInteger.ZERO) > 0) {
